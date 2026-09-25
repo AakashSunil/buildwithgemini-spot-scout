@@ -27,6 +27,7 @@ from google.genai import types
 from app.a2ui_utils import a2ui_callback
 from app.geocoding import lookup_destination_coordinates
 from app.image_gen import generate_parking_spot_visual
+from app.video_gen import generate_parking_spot_video
 from app.parking_db import (
     add_parking_spot,
     calculate_parking_fee,
@@ -71,6 +72,7 @@ root_agent = Agent(
         PreloadMemoryTool(),
         lookup_destination_coordinates,
         generate_parking_spot_visual,
+        generate_parking_spot_video,
         search_parking_spots,
         check_spot_occupancy_status,
         get_parking_spot_details,
