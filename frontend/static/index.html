@@ -755,7 +755,7 @@ function buildNode(id, comps, seen) {
         }
 
         // Clean out ALL redundant child text elements that repeat rate, clearance, ev, status, and entry tip
-        const textElements = Array.from(d.querySelectorAll(".a2text, p, div"));
+        const textElements = Array.from(d.querySelectorAll(".a2text, p, div, span"));
         textElements.forEach(t => {
           if (t.closest(".driver-hud-grid") || t.closest(".driver-callout") || t.closest(".driver-actions-bar")) return;
           const txt = t.textContent.trim().toLowerCase();
@@ -768,7 +768,7 @@ function buildNode(id, comps, seen) {
             return;
           }
 
-          // Aggressively remove text containing redundant telemetry or status
+          // Aggressively remove text containing redundant telemetry or any entry/driver tip (since it's placed in the dedicated tipBox)
           if (
             txt.includes("status:") ||
             txt.includes("filling up") ||
@@ -780,7 +780,8 @@ function buildNode(id, comps, seen) {
             txt.includes("clearance:") || txt.includes("clearance height:") ||
             txt.includes("ev charging:") || txt.includes("ev chargers:") ||
             txt.includes("occupancy:") || txt.includes("open spaces") ||
-            txt.includes("entry tip:") || txt.includes("driver tip:")
+            txt.includes("entry tip") || txt.includes("entry_tip") ||
+            txt.includes("driver tip") || txt.includes("driver_tip")
           ) {
             t.remove();
           }
@@ -951,7 +952,9 @@ function renderReply(b, parts) {
   const texts = parts.filter(p => p && (p.kind === "text" || (!p.kind && p.text))).map(p => p.text || "");
   const a2ui = parts.filter(p => p && p.kind === "a2ui" && p.data).map(p => p.data);
 
-  const textStr = texts.join("\n").trim();
+  // Clean any accidental "Entry Tip:" in conversational prose to "Driver Tip:"
+  let textStr = texts.join("\n").trim();
+  textStr = textStr.replace(/\b[Ee]ntry\s*[Tt]ip[:\s]*/g, "Driver Tip: ");
   if (textStr) b.appendChild(el("div", null, textStr));
 
   if (a2ui.length) {
