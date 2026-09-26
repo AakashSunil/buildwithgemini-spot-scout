@@ -55,10 +55,10 @@ def search_parking_spots(
     requires_ev_charging: Optional[bool] = None,
     spot_type: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
-    """Search for parking spots matching criteria. Uses local database and dynamically discovers real-world parking via OpenStreetMap.
+    """Dynamically search and discover real-world parking spots near any location or landmark worldwide via OpenStreetMap API.
 
     Args:
-        neighborhood: Target neighborhood, destination, or landmark (e.g. 'Union Square', 'Chase Center', 'SoMa', 'Times Square').
+        neighborhood: Target neighborhood, destination, or landmark (e.g. 'Union Square', 'Yerba Buena', 'Times Square').
         city: The city to search in. Default is 'san_francisco'.
         max_hourly_rate: Maximum hourly price budget.
         min_clearance_inches: Minimum vehicle vertical clearance in inches.
@@ -66,82 +66,47 @@ def search_parking_spots(
         spot_type: Desired parking type ('garage', 'surface_lot', 'metered_street').
 
     Returns:
-        A list of matching parking spots with details and availability.
+        A list of real-world parking facilities discovered dynamically from the map API.
     """
-    db = _get_db()
-    query = db.collection("parking_spots")
-
-    # City filter
-    normalized_city = "san_francisco" if city.lower() in ["sf", "san francisco", "san_francisco"] else city.lower()
-    query = query.where("city", "==", normalized_city)
-
-    docs = query.stream()
+    search_query = neighborhood or city or "parking"
     results = []
 
-    for doc in docs:
-        data = doc.to_dict()
-        data["id"] = doc.id
+    try:
+        from app.geocoding import lookup_destination_coordinates, discover_nearby_parking_spots
 
-        if neighborhood and neighborhood.lower() not in data.get("neighborhood", "").lower() and neighborhood.lower() not in data.get("name", "").lower():
-            continue
+        coords = lookup_destination_coordinates(search_query, city=city)
+        if coords.get("found"):
+            lat = coords.get("latitude")
+            lon = coords.get("longitude")
+            discovered = discover_nearby_parking_spots(lat, lon, radius_km=2.0)
 
-        if max_hourly_rate is not None and data.get("hourly_rate", 0) > max_hourly_rate:
-            continue
+            for item in discovered:
+                spot_id = f"osm-{item.get('osm_id', abs(hash(item['name']))) % 1000000}"
+                # Strictly use dynamic API values. Do NOT invent rates or fake space counts.
+                dynamic_spot = {
+                    "id": spot_id,
+                    "name": item["name"],
+                    "address": item["address"] or "N.A.",
+                    "city": city.lower().replace(" ", "_"),
+                    "neighborhood": item["neighborhood"] or search_query,
+                    "hourly_rate": None,
+                    "daily_max": None,
+                    "spot_type": "garage" if "garage" in item["name"].lower() else "surface_lot",
+                    "clearance_height_inches": None,
+                    "has_ev_charging": False,
+                    "ev_chargers_count": 0,
+                    "covered": True if "garage" in item["name"].lower() else False,
+                    "security_level": "N.A.",
+                    "total_spaces": None,
+                    "available_spaces": None,
+                    "driver_tip": f"Location: {item['address'] if item['address'] else 'N.A.'}. Specific real-time rates or live capacity not published by map API (N.A.).",
+                }
 
-        if min_clearance_inches is not None and data.get("clearance_height_inches", 120) < min_clearance_inches:
-            continue
-
-        if requires_ev_charging is True and not data.get("has_ev_charging", False):
-            continue
-
-        if spot_type and data.get("spot_type") != spot_type:
-            continue
-
-        results.append(data)
-
-    # Dynamic Real-World Discovery: If local results are few (< 2) or user searched a specific landmark/neighborhood
-    if len(results) < 2 and neighborhood:
-        try:
-            from app.geocoding import lookup_destination_coordinates, discover_nearby_parking_spots
-
-            coords = lookup_destination_coordinates(neighborhood, city=city)
-            if coords.get("found"):
-                lat = coords.get("latitude")
-                lon = coords.get("longitude")
-                discovered = discover_nearby_parking_spots(lat, lon, radius_km=2.0)
-
-                for item in discovered:
-                    # Avoid duplicate if name already in results
-                    if any(r.get("name", "").lower() == item["name"].lower() for r in results):
-                        continue
-
-                    spot_id = f"osm-{item.get('osm_id', abs(hash(item['name']))) % 1000000}"
-                    # DO NOT invent synthetic rates or capacities, and DO NOT store synthetic entries into Firestore
-                    # If specific rate or place occupancy is not verified in source data, explicitly mark as None so it displays "N.A."
-                    dynamic_spot = {
-                        "id": spot_id,
-                        "name": item["name"],
-                        "address": item["address"] or "N.A.",
-                        "city": normalized_city,
-                        "neighborhood": item["neighborhood"] or neighborhood or "N.A.",
-                        "hourly_rate": None,
-                        "daily_max": None,
-                        "spot_type": "surface_lot",
-                        "clearance_height_inches": None,
-                        "has_ev_charging": False,
-                        "ev_chargers_count": 0,
-                        "covered": False,
-                        "security_level": "N.A.",
-                        "total_spaces": None,
-                        "available_spaces": None,
-                        "driver_tip": f"Location: {item['address'] if item['address'] else 'N.A.'}. Specific real-time rates or capacity not published (N.A.).",
-                    }
-
-                    results.append(dynamic_spot)
-                    if len(results) >= 4:
-                        break
-        except Exception as e:
-            pass
+                results.append(dynamic_spot)
+                if len(results) >= 4:
+                    break
+    except Exception as e:
+        pass
 
     return results
 
