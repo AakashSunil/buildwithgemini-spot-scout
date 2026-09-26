@@ -160,6 +160,37 @@
   button.send-btn:hover { background:var(--accent-hover); transform:translateY(-1px); }
   button.send-btn:active { transform:translateY(0); }
 
+  /* Voice Control Microphone Button */
+  .mic-btn {
+    padding:0.8rem 1rem;
+    border:1.5px solid var(--border);
+    border-radius:12px;
+    background:#f8fafc;
+    color:#475569;
+    font-size:1.15rem;
+    cursor:pointer;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    transition:all 0.15s ease;
+  }
+  .mic-btn:hover {
+    background:var(--accent-light);
+    color:var(--accent);
+    border-color:var(--accent);
+  }
+  .mic-btn.listening {
+    background:#fee2e2;
+    border-color:#ef4444;
+    color:#dc2626;
+    animation:micPulse 1.2s infinite ease-in-out;
+  }
+  @keyframes micPulse {
+    0% { transform:scale(1); box-shadow:0 0 0 0 rgba(239,68,68,0.4); }
+    50% { transform:scale(1.05); box-shadow:0 0 0 8px rgba(239,68,68,0); }
+    100% { transform:scale(1); box-shadow:0 0 0 0 rgba(239,68,68,0); }
+  }
+
   /* --- A2UI component styles (Card, Column, Row, Text, Divider, List, Image, Icon) --- */
   .a2card {
     border:1px solid var(--border);
@@ -338,7 +369,8 @@
 </div>
 
 <form id="form">
-  <input id="input" placeholder="Ask SpotScout about SF parking, rates, clearance, or rules…" autocomplete="off" autofocus>
+  <button type="button" class="mic-btn" id="micBtn" title="Speak to SpotScout (Voice Input)">🎙️</button>
+  <input id="input" placeholder="Ask SpotScout or tap mic to speak…" autocomplete="off" autofocus>
   <button class="send-btn">Send</button>
 </form>
 
@@ -346,9 +378,80 @@
 const log = document.getElementById("log");
 const form = document.getElementById("form");
 const input = document.getElementById("input");
+const micBtn = document.getElementById("micBtn");
 const lightboxOverlay = document.getElementById("lightboxOverlay");
 const lightboxImg = document.getElementById("lightboxImg");
 const lightboxClose = document.getElementById("lightboxClose");
+
+// Voice Control: Speech Recognition (Web Speech API)
+const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+let recognition = null;
+let isRecording = false;
+
+if (SpeechRecognition) {
+  recognition = new SpeechRecognition();
+  recognition.continuous = false;
+  recognition.interimResults = true;
+  recognition.lang = "en-US";
+
+  recognition.onstart = () => {
+    isRecording = true;
+    micBtn.classList.add("listening");
+    micBtn.innerHTML = "🔴";
+    input.placeholder = "Listening… speak your parking query now";
+  };
+
+  recognition.onresult = (event) => {
+    let transcript = "";
+    for (let i = event.resultIndex; i < event.results.length; ++i) {
+      transcript += event.results[i][0].transcript;
+    }
+    input.value = transcript;
+  };
+
+  recognition.onerror = (event) => {
+    console.warn("Speech recognition error:", event.error);
+    stopListening();
+  };
+
+  recognition.onend = () => {
+    stopListening();
+    // If text was recognized, automatically submit after a brief pause
+    if (input.value.trim().length > 3) {
+      setTimeout(() => {
+        if (form.requestSubmit) form.requestSubmit();
+        else form.dispatchEvent(new Event("submit", { cancelable: true }));
+      }, 500);
+    }
+  };
+
+  function stopListening() {
+    isRecording = false;
+    micBtn.classList.remove("listening");
+    micBtn.innerHTML = "🎙️";
+    input.placeholder = "Ask SpotScout or tap mic to speak…";
+  }
+
+  micBtn.addEventListener("click", () => {
+    if (isRecording) {
+      recognition.stop();
+      stopListening();
+    } else {
+      try {
+        recognition.start();
+      } catch (err) {
+        console.error("SpeechRecognition start error:", err);
+      }
+    }
+  });
+} else {
+  // Browser doesn't support Web Speech API
+  micBtn.title = "Voice recognition not supported in this browser";
+  micBtn.style.opacity = "0.4";
+  micBtn.addEventListener("click", () => {
+    alert("Speech recognition is not supported in this browser. Please use Chrome, Safari, or Edge for voice input.");
+  });
+}
 
 function openLightbox(url) {
   if (!url) return;
