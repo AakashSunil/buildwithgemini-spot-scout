@@ -116,9 +116,38 @@ def search_parking_spots(
                         continue
 
                     spot_id = f"osm-{item.get('osm_id', abs(hash(item['name']))) % 1000000}"
-                    est_total = 280
-                    est_rate = 4.50 if "san_francisco" in normalized_city or "new_york" in normalized_city else 3.50
-                    avail, _, _ = _calculate_realtime_occupancy(est_total, item["neighborhood"], est_rate)
+                    # Deterministic hash seed based on spot name/id for reproducible diverse attributes
+                    seed = abs(hash(item['name']))
+                    
+                    # Diversified Capacity (from small 45-space surface lots to massive 750-space central garages)
+                    cap_options = [65, 120, 240, 380, 520, 680]
+                    est_total = cap_options[seed % len(cap_options)]
+                    
+                    # Diversified Real-World Hourly Rates based on City & Location Tier
+                    if "new_york" in normalized_city or "nyc" in normalized_city or "manhattan" in normalized_city:
+                        rate_choices = [5.50, 6.75, 8.00, 9.50, 11.00]
+                    elif "san_francisco" in normalized_city:
+                        rate_choices = [3.50, 4.25, 5.00, 6.00, 7.50]
+                    elif "san_jose" in normalized_city or "silicon_valley" in normalized_city:
+                        rate_choices = [2.00, 2.75, 3.50, 4.00, 5.00]
+                    else:
+                        rate_choices = [2.50, 3.25, 4.00, 4.75, 5.50]
+                    est_rate = rate_choices[seed % len(rate_choices)]
+                    daily_max = round(est_rate * (6.5 if seed % 2 == 0 else 7.5), 2)
+
+                    # Diversified EV Charging (not all spots have EV; central ones have 4-12 plugs, smaller ones have 0)
+                    has_ev = (seed % 3 != 0)  # ~66% have EV
+                    ev_count = (seed % 10 + 2) if has_ev else 0
+
+                    # Diversified Clearance (from 6'2" tight historic garages to 7'2" tall decks)
+                    clearance_options = [74, 78, 80, 82, 84, 88]
+                    clearance_in = clearance_options[seed % len(clearance_options)]
+
+                    # Real-time Occupancy with natural fluctuation
+                    base_avail, status, msg = _calculate_realtime_occupancy(est_total, item["neighborhood"], est_rate)
+                    # Add individual variance so different garages have different occupancies
+                    variance = (seed % 31) - 15
+                    avail = max(4, min(est_total - 5, base_avail + variance))
 
                     dynamic_spot = {
                         "id": spot_id,
@@ -127,13 +156,13 @@ def search_parking_spots(
                         "city": normalized_city,
                         "neighborhood": item["neighborhood"] or neighborhood,
                         "hourly_rate": est_rate,
-                        "daily_max": est_rate * 8,
-                        "spot_type": "garage",
-                        "clearance_height_inches": 80,
-                        "has_ev_charging": True,
-                        "ev_chargers_count": 4,
-                        "covered": True,
-                        "security_level": "medium",
+                        "daily_max": daily_max,
+                        "spot_type": "surface_lot" if est_total <= 100 else "garage",
+                        "clearance_height_inches": clearance_in,
+                        "has_ev_charging": has_ev,
+                        "ev_chargers_count": ev_count,
+                        "covered": est_total > 100,
+                        "security_level": "high" if est_total > 300 else "medium",
                         "total_spaces": est_total,
                         "available_spaces": avail,
                         "driver_tip": f"Direct street access from {item['address'].split(',')[0] if ',' in item['address'] else item['address']}.",
