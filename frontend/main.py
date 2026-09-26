@@ -205,7 +205,120 @@ async def chat(req: Request):
     return JSONResponse({"parts": parts})
 
 
-# Serve the chat UI (keep this mount last so /chat wins).
+async def _run_agent_query(user_query: str, user_id: str = "webhook-user") -> str:
+    """Helper to query the agent engine and return a clean text response for bots/webhooks."""
+    async with httpx.AsyncClient(headers=_auth_headers(), timeout=120) as client:
+        card = await _get_card(client)
+        factory = ClientFactory(
+            ClientConfig(
+                supported_transports=[
+                    TransportProtocol.jsonrpc,
+                    TransportProtocol.http_json,
+                ],
+                httpx_client=client,
+            )
+        )
+        a2a_client = factory.create(card)
+        msg = Message(
+            message_id=str(uuid.uuid4()),
+            role=Role.user,
+            parts=[Part(root=TextPart(text=user_query))],
+            context_id=_contexts.get(user_id),
+        )
+
+        extracted_texts = []
+        async for event in a2a_client.send_message(msg):
+            if not isinstance(event, tuple):
+                continue
+            task, update = event
+            if task is not None and getattr(task, "context_id", None):
+                _contexts[user_id] = task.context_id
+            if isinstance(update, TaskArtifactUpdateEvent):
+                for p in _extract_parts(update.artifact.parts):
+                    if p.get("kind") == "text":
+                        extracted_texts.append(p["text"])
+                    elif p.get("kind") == "a2ui":
+                        # Flatten A2UI components into clean text for chat apps
+                        su = p.get("data", {}).get("surfaceUpdate", {})
+                        for comp in su.get("components", []):
+                            txt = comp.get("component", {}).get("Text", {}).get("text", {})
+                            val = txt.get("literalString") if isinstance(txt, dict) else str(txt)
+                            if val:
+                                extracted_texts.append(val)
+
+        reply = "\n".join(extracted_texts).strip()
+        if not reply:
+            reply = "SpotScout: No parking spots found matching your query."
+        return reply
+
+
+@app.post("/webhook/telegram")
+async def webhook_telegram(req: Request):
+    """Webhook endpoint for Telegram Bot API updates."""
+    try:
+        body = await req.json()
+        message = body.get("message") or body.get("channel_post") or {}
+        text = message.get("text", "")
+        chat_id = message.get("chat", {}).get("id")
+        user_id = str(message.get("from", {}).get("id", chat_id or "telegram-user"))
+
+        if not text or not chat_id:
+            return JSONResponse({"ok": True, "status": "ignored_non_text"})
+
+        bot_token = os.environ.get("TELEGRAM_BOT_TOKEN")
+        reply_text = await _run_agent_query(text, user_id=f"tg-{user_id}")
+
+        if bot_token:
+            async with httpx.AsyncClient(timeout=10) as http_client:
+                await http_client.post(
+                    f"https://api.telegram.org/bot{bot_token}/sendMessage",
+                    json={"chat_id": chat_id, "text": reply_text},
+                )
+
+        return JSONResponse({"ok": True, "chat_id": chat_id, "reply": reply_text})
+    except Exception as e:
+        return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
+
+
+@app.post("/webhook/whatsapp")
+@app.post("/webhook/sms")
+async def webhook_twilio_whatsapp(req: Request):
+    """Twilio SMS / WhatsApp Messaging Webhook endpoint."""
+    form_data = await req.form()
+    incoming_msg = form_data.get("Body", "")
+    from_number = form_data.get("From", "twilio-user")
+
+    reply = await _run_agent_query(incoming_msg, user_id=f"tw-{from_number}")
+    twiml_response = f"""<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+    <Message>{reply}</Message>
+</Response>"""
+    return JSONResponse(
+        content={"reply": reply, "twiml": twiml_response},
+        headers={"Content-Type": "application/json"}
+    )
+
+
+@app.post("/api/v1/query")
+async def api_generic_query(req: Request):
+    """Universal REST API endpoint for third-party bots, iOS shortcuts, and smart assistant webhooks."""
+    body = await req.json()
+    query = body.get("query") or body.get("message", "")
+    user_id = body.get("user_id", "api-user")
+
+    if not query:
+        return JSONResponse({"error": "Missing 'query' parameter"}, status_code=400)
+
+    reply = await _run_agent_query(query, user_id=user_id)
+    return JSONResponse({
+        "status": "success",
+        "query": query,
+        "reply": reply,
+        "source": "SpotScout Vertex AI Agent Engine"
+    })
+
+
+# Serve the chat UI (keep this mount last so /chat and webhooks win).
 app.mount("/", StaticFiles(directory="static", html=True), name="static")
 
 
