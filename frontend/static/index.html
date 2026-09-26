@@ -747,15 +747,17 @@ function buildNode(id, comps, seen) {
         let availStatus = "available"; // available, filling, full
         
         // Match patterns like:
-        // "340 / 1,865 spaces available", "126 / 280 spaces available", "126 of 280 stalls free", "310 stalls available", "(126 stalls free)"
-        const spacesFractionMatch = fullText.match(/([0-9]+)\s*(?:\/|of)\s*([0-9,]+)\s*(?:spaces?|spots?|stalls?)?/i);
-        const spacesMatch = spacesFractionMatch || fullText.match(/([0-9]+)\s*(?:spaces?|spots?|stalls?)\s*(?:free|available|open)/i) || fullText.match(/(?:free|available|open)(?:\s*(?:spaces?|spots?|stalls?))?[:\s]*([0-9]+)/i);
+        // "340 / 1,865 spaces available", "126 of 280 stalls free"
+        // Avoid matching "24/7" (which was incorrectly matched as 24 of 7 spaces!)
+        const cleanTextForSpots = fullText.replace(/24\s*\/\s*7/gi, "twentyfour-seven");
+        const spacesFractionMatch = cleanTextForSpots.match(/([0-9]+)\s*(?:\/|of)\s*([0-9,]+)\s*(?:spaces?|spots?|stalls?)/i);
+        const singleSpacesMatch = cleanTextForSpots.match(/([0-9]+)\s*(?:spaces?|spots?|stalls?)\s*(?:free|available|open)/i) || cleanTextForSpots.match(/(?:free|available|open)(?:\s*(?:spaces?|spots?|stalls?))?[:\s]*([0-9]+)/i);
 
         if (spacesFractionMatch) {
           availSpaces = parseInt(spacesFractionMatch[1].replace(/,/g, ""), 10);
           totalSpaces = parseInt(spacesFractionMatch[2].replace(/,/g, ""), 10);
-        } else if (spacesMatch) {
-          availSpaces = parseInt(spacesMatch[1].replace(/,/g, ""), 10);
+        } else if (singleSpacesMatch) {
+          availSpaces = parseInt(singleSpacesMatch[1].replace(/,/g, ""), 10);
         }
 
         if (availSpaces !== null) {
@@ -776,8 +778,18 @@ function buildNode(id, comps, seen) {
         const hasEvText = fullText.toLowerCase().includes("ev charging on-site") || fullText.toLowerCase().includes("ev charging: yes") || fullText.toLowerCase().includes("has ev charging") || fullText.toLowerCase().includes("ev chargers available") || fullText.toLowerCase().includes("ev charging available");
         const noEvText = fullText.toLowerCase().includes("no ev") || fullText.toLowerCase().includes("ev charging: no") || fullText.toLowerCase().includes("ev: none");
 
-        // 4. Clearance Height
-        const clearanceMatch = fullText.match(/([0-9]+['’][0-9]+["”]?)/) || fullText.match(/([0-9]{2,3})\s*inches/i);
+        // 4. Clearance Height (Match feet/inches like 6'6" or raw inches like 78 inches / 78 in)
+        const feetMatch = fullText.match(/([0-9]+['’][0-9]+["”]?)/);
+        const inchesMatch = fullText.match(/([0-9]{2,3})\s*(?:inches|in\b)/i);
+        let formattedClearance = null;
+        if (feetMatch) {
+          formattedClearance = feetMatch[1];
+        } else if (inchesMatch) {
+          const totInches = parseInt(inchesMatch[1], 10);
+          const ft = Math.floor(totInches / 12);
+          const remIn = totInches % 12;
+          formattedClearance = `${ft}'${remIn}" (${totInches} in)`;
+        }
 
         // 5. Driver Tip (single clean extract, discarding extra "Entry tip:" / "Driver tip:" duplication)
         const tipMatch = fullText.match(/(?:driver\s*tip|entry\s*tip)[:\s]+([^.\n]+(?:\.[^.\n]+)?)/i);
@@ -785,8 +797,8 @@ function buildNode(id, comps, seen) {
         // Build the Glanceable Driver Telemetry Grid (DYNAMIC: only include cells with verified data; omit unverified/N.A. cells)
         const hudGrid = el("div", "driver-hud-grid");
 
-        // Parse Total Capacity if mentioned standalone (e.g. "Total Capacity: 1,865", "1,865 total spaces")
-        const capacityMatch = fullText.match(/total\s*(?:capacity|spaces?)?[:\s]*([0-9,]+)/i) || fullText.match(/([0-9,]+)\s*total\s*(?:spaces|stalls)/i);
+        // Parse Total Capacity if mentioned standalone (e.g. "Capacity: 2,585 stalls", "Total Capacity: 1,865")
+        const capacityMatch = fullText.match(/capacity[:\s]*([0-9,]+)/i) || fullText.match(/total\s*(?:capacity|spaces?)?[:\s]*([0-9,]+)/i) || fullText.match(/([0-9,]+)\s*total\s*(?:spaces|stalls)/i);
         if (!totalSpaces && capacityMatch) {
           totalSpaces = parseInt(capacityMatch[1].replace(/,/g, ""), 10);
         }
@@ -856,14 +868,13 @@ function buildNode(id, comps, seen) {
         }
 
         // Cell 4: Clearance Height (Omit if not present or unverified)
-        if (clearanceMatch && !fullText.includes("clearance: n.a.")) {
+        if (formattedClearance && !fullText.includes("clearance: n.a.") && !fullText.includes("clearance: not published")) {
           const clearCell = el("div", "hud-cell hud-cell-clearance");
-          const heightStr = clearanceMatch[1];
-          const isTight = heightStr.includes("6'2") || heightStr.includes("74");
+          const isTight = formattedClearance.includes("6'2") || formattedClearance.includes("74");
           if (isTight) clearCell.classList.add("hud-warning");
           clearCell.innerHTML = `
             <div class="hud-label">📏 Clearance</div>
-            <div class="hud-value">${heightStr}</div>
+            <div class="hud-value">${formattedClearance}</div>
             <div class="hud-sub">${isTight ? '⚠️ Low Clearance' : '✓ Normal SUV'}</div>
           `;
           hudGrid.appendChild(clearCell);
