@@ -466,9 +466,10 @@
 <div class="quick-prompts-container">
   <div class="quick-title">Suggested Inquiries</div>
   <div class="quick-prompts">
-    <button type="button" class="quick-chip" data-prompt="Find parking near Union Square for 3 hours with clearance above 6ft 6in">🅿️ Union Square (3 hrs, &gt;6ft 6in)</button>
-    <button type="button" class="quick-chip" data-prompt="Check live occupancy and clearance for Sutter-Stockton Garage, and generate an entrance guide image">📷 Sutter-Stockton Live Status &amp; Entrance</button>
-    <button type="button" class="quick-chip" data-prompt="What are SF parking regulations for yellow curb loading and parking on steep hills?">📜 SF Curb Rules &amp; Hill Parking Laws</button>
+    <button type="button" class="quick-chip" data-prompt="Find parking near Union Square with clearance above 6ft 6in">🅿️ Union Square (&gt;6'6" Clearance)</button>
+    <button type="button" class="quick-chip" data-prompt="Find parking near Chase Center with EV charging available">⚡ Chase Center (EV Charging)</button>
+    <button type="button" class="quick-chip" data-prompt="Find parking near Times Square, New York for 3 hours">🗽 Times Square, NY (3 Hours)</button>
+    <button type="button" class="quick-chip" data-prompt="What are the SF parking rules for yellow curb loading zones and parking on steep hills?">📜 SF Curb &amp; Hill Parking Rules</button>
   </div>
 </div>
 
@@ -1031,6 +1032,45 @@ function flattenText(messages) {
   return out.join("\n").trim();
 }
 
+function renderMarkdownContent(rawText) {
+  // Convert markdown bold, bullet lists, and headings into clean HTML
+  let lines = rawText.split("\n");
+  let html = "";
+  let inList = false;
+
+  for (let line of lines) {
+    let trimmed = line.trim();
+    if (!trimmed) {
+      if (inList) { html += "</ul>"; inList = false; }
+      continue;
+    }
+
+    // Bold replacement: **text** -> <strong>text</strong>
+    let formatted = line.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
+    formatted = formatted.replace(/\*(.*?)\*/g, "<em>$1</em>");
+
+    // Headers
+    if (trimmed.startsWith("### ")) {
+      if (inList) { html += "</ul>"; inList = false; }
+      html += `<div style="font-size:1.05rem; font-weight:700; color:var(--text-primary); margin:0.6rem 0 0.3rem;">${formatted.replace(/^###\s*/, "")}</div>`;
+    } else if (trimmed.startsWith("## ")) {
+      if (inList) { html += "</ul>"; inList = false; }
+      html += `<div style="font-size:1.15rem; font-weight:700; color:var(--text-primary); margin:0.8rem 0 0.4rem;">${formatted.replace(/^##\s*/, "")}</div>`;
+    } else if (trimmed.startsWith("# ")) {
+      if (inList) { html += "</ul>"; inList = false; }
+      html += `<div style="font-size:1.25rem; font-weight:800; color:var(--text-primary); margin:1rem 0 0.5rem;">${formatted.replace(/^#\s*/, "")}</div>`;
+    } else if (trimmed.startsWith("- ") || trimmed.startsWith("* ")) {
+      if (!inList) { html += `<ul style="margin:0.4rem 0 0.6rem 1.2rem; padding:0; display:flex; flex-direction:column; gap:0.35rem;">`; inList = true; }
+      html += `<li style="line-height:1.5;">${formatted.replace(/^[-*]\s+/, "")}</li>`;
+    } else {
+      if (inList) { html += "</ul>"; inList = false; }
+      html += `<p style="margin:0.4rem 0; line-height:1.5;">${formatted}</p>`;
+    }
+  }
+  if (inList) html += "</ul>";
+  return html;
+}
+
 function renderReply(b, parts) {
   b.textContent = "";   // clear the "…" placeholder
   const texts = parts.filter(p => p && (p.kind === "text" || (!p.kind && p.text))).map(p => p.text || "");
@@ -1039,7 +1079,42 @@ function renderReply(b, parts) {
   // Clean any accidental "Entry Tip:" in conversational prose to "Driver Tip:"
   let textStr = texts.join("\n").trim();
   textStr = textStr.replace(/\b[Ee]ntry\s*[Tt]ip[:\s]*/g, "Driver Tip: ");
-  if (textStr) b.appendChild(el("div", null, textStr));
+
+  if (textStr) {
+    // If there are no A2UI cards returned (e.g. curb regulations, rules, or questions),
+    // wrap the formatted text into a clean Regulation / Legal Guide Card so it's visually elegant and not raw text
+    if (!a2ui.length) {
+      b.classList.add("rich");
+      const lawCard = el("div", "a2card");
+      lawCard.style.maxWidth = "750px";
+      lawCard.style.borderLeft = "5px solid var(--accent)";
+      
+      const headerRow = el("div", "a2row between");
+      headerRow.style.marginBottom = "0.75rem";
+      headerRow.style.paddingBottom = "0.5rem";
+      headerRow.style.borderBottom = "1px solid var(--border)";
+      
+      const titleSpan = el("span", "a2text a2-h3");
+      titleSpan.innerHTML = "📜 City Parking Regulations &amp; Rules";
+      
+      const badgeSpan = el("span", "badge-occupancy badge-available");
+      badgeSpan.textContent = "Verified Legal Guide";
+      
+      headerRow.appendChild(titleSpan);
+      headerRow.appendChild(badgeSpan);
+      lawCard.appendChild(headerRow);
+
+      const contentDiv = el("div");
+      contentDiv.innerHTML = renderMarkdownContent(textStr);
+      lawCard.appendChild(contentDiv);
+      b.appendChild(lawCard);
+    } else {
+      const parsedHtml = renderMarkdownContent(textStr);
+      const proseDiv = el("div");
+      proseDiv.innerHTML = parsedHtml;
+      b.appendChild(proseDiv);
+    }
+  }
 
   if (a2ui.length) {
     b.classList.add("rich");
