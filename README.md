@@ -31,7 +31,10 @@ SpotScout is built using the **Agent Development Kit (ADK)** and the **Gemini 3.
   - Parking spot summary cards with rate tags, distance, and amenity badges.
   - Side-by-side comparison tables evaluating rates, clearance, and features across multiple garages.
 
-### 5. Multi-Modal Visuals & Video Generation (Cloud Storage)
+### 5. Official Parking Regulations & Municipal Knowledge Base (Vertex AI RAG Engine)
+- **`consult_sf_parking_regulations`**: Searches an official SFMTA municipal regulations corpus managed in Vertex AI RAG Engine (serverless mode with `text-embedding-005` in `us-central1`). Grounded on official curb color codes, street sweeping schedules, 72-hour limits, driveway clearance, and hill wheel curbing laws.
+
+### 6. Multi-Modal Visuals & Video Generation (Cloud Storage)
 - **`generate_parking_spot_visual`**: Generates high-resolution entrance and signage images using **`gemini-3.1-flash-lite-image`** in the `global` region. Saves the image as a session artifact in ADK and streams the image bytes directly to a public Google Cloud Storage bucket (`spot-scout-qwiklabs-gcp-03-d27323349804`).
 - **`generate_parking_spot_video`**: Generates 3-second entrance approach videos using Google's Omni model (**`gemini-omni-flash-preview`**) via the Interactions API. Persists the video via `tool_context.save_artifact` and uploads bytes to Cloud Storage, returning a public HTTPS URL.
 
@@ -42,6 +45,7 @@ SpotScout is built using the **Agent Development Kit (ADK)** and the **Gemini 3.
 | Service | Purpose | Implementation |
 |---|---|---|
 | **Gemini 3.6 Flash** | Core reasoning, conversational logic, and tool orchestration | `google.adk.models.Gemini` |
+| **Vertex AI RAG Engine** | Grounding on official SF municipal parking and curb regulations | Serverless Vector Search + `text-embedding-005` in `us-central1` |
 | **Vertex AI Memory Bank** | Long-term memory across sessions | `PreloadMemoryTool` & `add_session_to_memory()` |
 | **Cloud Firestore** | Real-time parking catalog, live occupancy, and rates | `google.cloud.firestore.Client` |
 | **Cloud Storage** | Public hosting for generated entrance visuals and videos | `google.cloud.storage.Client` |
@@ -56,7 +60,6 @@ SpotScout is built using the **Agent Development Kit (ADK)** and the **Gemini 3.
 The following features from the initial project design brief are currently roadmap items:
 - **SFMTA Open Data API Integration**: Real-time integration with live city street sweeping sensors and parking meters *(currently simulated via Firestore)*.
 - **Python Code Execution Sandbox**: Running custom mathematical optimization scripts for meter expiration curves.
-- **Vertex AI RAG Engine**: Grounding agent responses on official San Francisco municipal curb code documents.
 
 ---
 

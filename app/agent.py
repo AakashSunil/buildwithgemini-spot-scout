@@ -28,6 +28,7 @@ from app.a2ui_utils import a2ui_callback
 from app.geocoding import lookup_destination_coordinates
 from app.image_gen import generate_parking_spot_visual
 from app.video_gen import generate_parking_spot_video
+from app.rag_tool import consult_sf_parking_regulations
 from app.parking_db import (
     add_parking_spot,
     calculate_parking_fee,
@@ -71,6 +72,7 @@ root_agent = Agent(
     tools=[
         PreloadMemoryTool(),
         lookup_destination_coordinates,
+        consult_sf_parking_regulations,
         generate_parking_spot_visual,
         generate_parking_spot_video,
         search_parking_spots,
