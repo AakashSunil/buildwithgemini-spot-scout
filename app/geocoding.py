@@ -9,7 +9,7 @@ import json
 import os
 import urllib.parse
 import urllib.request
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 
 def lookup_destination_coordinates(query: str, city: str = "San Francisco") -> Dict[str, Any]:
@@ -64,3 +64,56 @@ def lookup_destination_coordinates(query: str, city: str = "San Francisco") -> D
             "query": query,
             "error": f"Failed to connect to geocoding service: {str(e)}",
         }
+
+
+def discover_nearby_parking_spots(latitude: float, longitude: float, radius_km: float = 1.5) -> List[Dict[str, Any]]:
+    """Discovers real-world parking garages, surface lots, and facilities near coordinates using OpenStreetMap.
+
+    Args:
+        latitude: Target latitude coordinate.
+        longitude: Target longitude coordinate.
+        radius_km: Search radius in kilometers (defaults to 1.5km).
+
+    Returns:
+        A list of real-world parking facilities with names, coordinates, and types.
+    """
+    # Degree offset for bounding box (~0.01 deg ~= 1.1km)
+    delta = (radius_km / 111.0) * 1.2
+    min_lat = latitude - delta
+    max_lat = latitude + delta
+    min_lon = longitude - delta
+    max_lon = longitude + delta
+
+    viewbox = f"{min_lon:.5f},{max_lat:.5f},{max_lon:.5f},{min_lat:.5f}"
+    url = f"https://nominatim.openstreetmap.org/search?amenity=parking&bounded=1&viewbox={viewbox}&format=json&limit=10&addressdetails=1"
+
+    user_agent = os.getenv("NOMINATIM_USER_AGENT", "SpotScoutParkingFinder/1.0 (GoogleAgentPlatform)")
+    req = urllib.request.Request(url, headers={"User-Agent": user_agent})
+
+    try:
+        with urllib.request.urlopen(req, timeout=8) as response:
+            items = json.loads(response.read().decode())
+            results = []
+            for item in items:
+                raw_name = item.get("name")
+                disp = item.get("display_name", "").split(",")[0].strip()
+                name = raw_name or (disp if "parking" in disp.lower() or "garage" in disp.lower() else f"{disp} Parking")
+                
+                addr = item.get("address", {})
+                neighborhood = addr.get("neighbourhood") or addr.get("suburb") or addr.get("city_district") or "Metro Area"
+                road = addr.get("road", "")
+                city_name = addr.get("city") or addr.get("town") or "Metro"
+
+                results.append({
+                    "name": name,
+                    "address": f"{road}, {city_name}".strip(", "),
+                    "neighborhood": neighborhood,
+                    "city": city_name.lower().replace(" ", "_"),
+                    "latitude": float(item.get("lat", 0.0)),
+                    "longitude": float(item.get("lon", 0.0)),
+                    "osm_id": item.get("osm_id"),
+                })
+            return results
+    except Exception as e:
+        return []
+
