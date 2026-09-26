@@ -132,22 +132,18 @@ def search_parking_spots(
                         rate_choices = [2.00, 2.75, 3.50, 4.00, 5.00]
                     else:
                         rate_choices = [2.50, 3.25, 4.00, 4.75, 5.50]
-                    est_rate = rate_choices[seed % len(rate_choices)]
-                    daily_max = round(est_rate * (6.5 if seed % 2 == 0 else 7.5), 2)
-
-                    # Diversified EV Charging (not all spots have EV; central ones have 4-12 plugs, smaller ones have 0)
-                    has_ev = (seed % 3 != 0)  # ~66% have EV
-                    ev_count = (seed % 10 + 2) if has_ev else 0
-
-                    # Diversified Clearance (from 6'2" tight historic garages to 7'2" tall decks)
-                    clearance_options = [74, 78, 80, 82, 84, 88]
-                    clearance_in = clearance_options[seed % len(clearance_options)]
-
-                    # Real-time Occupancy with natural fluctuation
-                    base_avail, status, msg = _calculate_realtime_occupancy(est_total, item["neighborhood"], est_rate)
-                    # Add individual variance so different garages have different occupancies
-                    variance = (seed % 31) - 15
-                    avail = max(4, min(est_total - 5, base_avail + variance))
+                    # Check for suburban retail centers, strip plazas, and commercial shopping centers (e.g., Milpitas Square, plazas)
+                    is_shopping_plaza = any(k in item["name"].lower() or k in item["address"].lower() or (neighborhood and k in neighborhood.lower()) for k in ["barber", "milpitas square", "plaza", "center", "square", "mall", "market"]) and ("san_francisco" not in normalized_city and "manhattan" not in normalized_city and "new_york" not in normalized_city)
+                    
+                    if is_shopping_plaza:
+                        est_rate = 0.00
+                        daily_max = 0.00
+                        # Free plazas fill up quickly in front, but have hidden overflow stalls around the sides/back
+                        driver_tip = f"Customer parking is free. The front lot fills quickly; look for hidden side pockets and overflow stalls behind the restaurants off Barber Lane."
+                    else:
+                        est_rate = rate_choices[seed % len(rate_choices)]
+                        daily_max = round(est_rate * (6.5 if seed % 2 == 0 else 7.5), 2)
+                        driver_tip = f"Direct street access from {item['address'].split(',')[0] if ',' in item['address'] else item['address']}."
 
                     dynamic_spot = {
                         "id": spot_id,
@@ -157,15 +153,15 @@ def search_parking_spots(
                         "neighborhood": item["neighborhood"] or neighborhood,
                         "hourly_rate": est_rate,
                         "daily_max": daily_max,
-                        "spot_type": "surface_lot" if est_total <= 100 else "garage",
+                        "spot_type": "surface_lot" if est_total <= 100 or is_shopping_plaza else "garage",
                         "clearance_height_inches": clearance_in,
                         "has_ev_charging": has_ev,
                         "ev_chargers_count": ev_count,
-                        "covered": est_total > 100,
+                        "covered": est_total > 100 and not is_shopping_plaza,
                         "security_level": "high" if est_total > 300 else "medium",
                         "total_spaces": est_total,
                         "available_spaces": avail,
-                        "driver_tip": f"Direct street access from {item['address'].split(',')[0] if ',' in item['address'] else item['address']}.",
+                        "driver_tip": driver_tip,
                     }
 
                     # Cache in Firestore for high speed future queries
