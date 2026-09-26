@@ -747,15 +747,15 @@ function buildNode(id, comps, seen) {
         let availStatus = "available"; // available, filling, full
         
         // Match patterns like:
-        // "126 / 280 spaces available", "126 of 280 stalls free", "310 stalls available", "(126 stalls free)"
-        const spacesFractionMatch = fullText.match(/([0-9]+)\s*(?:\/|of)\s*([0-9]+)\s*(?:spaces?|spots?|stalls?)?/i);
+        // "340 / 1,865 spaces available", "126 / 280 spaces available", "126 of 280 stalls free", "310 stalls available", "(126 stalls free)"
+        const spacesFractionMatch = fullText.match(/([0-9]+)\s*(?:\/|of)\s*([0-9,]+)\s*(?:spaces?|spots?|stalls?)?/i);
         const spacesMatch = spacesFractionMatch || fullText.match(/([0-9]+)\s*(?:spaces?|spots?|stalls?)\s*(?:free|available|open)/i) || fullText.match(/(?:free|available|open)(?:\s*(?:spaces?|spots?|stalls?))?[:\s]*([0-9]+)/i);
 
         if (spacesFractionMatch) {
-          availSpaces = parseInt(spacesFractionMatch[1], 10);
-          totalSpaces = parseInt(spacesFractionMatch[2], 10);
+          availSpaces = parseInt(spacesFractionMatch[1].replace(/,/g, ""), 10);
+          totalSpaces = parseInt(spacesFractionMatch[2].replace(/,/g, ""), 10);
         } else if (spacesMatch) {
-          availSpaces = parseInt(spacesMatch[1], 10);
+          availSpaces = parseInt(spacesMatch[1].replace(/,/g, ""), 10);
         }
 
         if (availSpaces !== null) {
