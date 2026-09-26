@@ -785,9 +785,15 @@ function buildNode(id, comps, seen) {
         // Build the Glanceable Driver Telemetry Grid (DYNAMIC: only include cells with verified data; omit unverified/N.A. cells)
         const hudGrid = el("div", "driver-hud-grid");
 
-        // Cell 1: Available Spots (Omit if unverified or N.A.)
-        const hasSpotsData = availSpaces !== null && !fullText.includes("occupancy: not published") && !fullText.includes("occupancy / capacity: not published");
-        if (hasSpotsData) {
+        // Parse Total Capacity if mentioned standalone (e.g. "Total Capacity: 1,865", "1,865 total spaces")
+        const capacityMatch = fullText.match(/total\s*(?:capacity|spaces?)?[:\s]*([0-9,]+)/i) || fullText.match(/([0-9,]+)\s*total\s*(?:spaces|stalls)/i);
+        if (!totalSpaces && capacityMatch) {
+          totalSpaces = parseInt(capacityMatch[1].replace(/,/g, ""), 10);
+        }
+
+        // Cell 1: Spots / Capacity Cell
+        const hasLiveSpots = availSpaces !== null && !fullText.includes("not published statically") && !fullText.includes("occupancy: not published") && !fullText.includes("occupancy / capacity: not published");
+        if (hasLiveSpots) {
           const spotsCell = el("div", `hud-cell hud-cell-${availStatus}`);
           let countDisplay = `${availSpaces} Open`;
           let subDisplay = totalSpaces ? `of ${totalSpaces} Total` : "Available Now";
@@ -797,6 +803,15 @@ function buildNode(id, comps, seen) {
             <div class="hud-sub">${subDisplay}</div>
           `;
           hudGrid.appendChild(spotsCell);
+        } else if (totalSpaces) {
+          // Transparently show known total capacity without fabricating a live open count
+          const capacityCell = el("div", "hud-cell");
+          capacityCell.innerHTML = `
+            <div class="hud-label">🅿️ Total Capacity</div>
+            <div class="hud-value">${totalSpaces.toLocaleString()}</div>
+            <div class="hud-sub">Live slots fluctuate</div>
+          `;
+          hudGrid.appendChild(capacityCell);
         }
 
         // Cell 2: Parking Rate (Omit if unverified, missing, or N.A.)

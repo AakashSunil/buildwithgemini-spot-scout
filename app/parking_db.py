@@ -348,16 +348,16 @@ def check_spot_occupancy_status(
     name = spot.get("name", spot_id)
     neighborhood = spot.get("neighborhood", "")
 
-    if total_spaces is None or available_spaces is None or total_spaces <= 0:
+    if available_spaces is None:
         return {
             "spot_id": spot_id,
             "name": name,
             "neighborhood": neighborhood,
-            "total_spaces": "N.A.",
+            "total_spaces": total_spaces if total_spaces else "N.A.",
             "available_spaces": "N.A.",
             "occupancy_rate_percent": "N.A.",
             "status": "N.A.",
-            "status_message": "Real-time occupancy data is not published (N.A.) for this location.",
+            "status_message": f"Total capacity is {total_spaces} spaces; however, live real-time slot availability fluctuates continuously and is not published statically." if total_spaces else "Real-time occupancy data is not published (N.A.) for this location.",
             "has_ev_charging": spot.get("has_ev_charging", False),
             "ev_chargers_count": spot.get("ev_chargers_count", 0),
             "entry_tip": spot.get("entry_tip", ""),
