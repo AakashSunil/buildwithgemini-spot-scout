@@ -782,71 +782,66 @@ function buildNode(id, comps, seen) {
         // 5. Driver Tip (single clean extract, discarding extra "Entry tip:" / "Driver tip:" duplication)
         const tipMatch = fullText.match(/(?:driver\s*tip|entry\s*tip)[:\s]+([^.\n]+(?:\.[^.\n]+)?)/i);
 
-        // Build the 4-Cell Glanceable Driver Telemetry Grid
+        // Build the Glanceable Driver Telemetry Grid (DYNAMIC: only include cells with verified data; omit unverified/N.A. cells)
         const hudGrid = el("div", "driver-hud-grid");
 
-        // Cell 1: Available Spots (Shows exact count, or N.A. if unverified/unavailable)
-        const spotsCell = el("div", `hud-cell hud-cell-${availStatus}`);
-        let countDisplay = availSpaces !== null ? `${availSpaces} Open` : "N.A.";
-        let subDisplay = totalSpaces ? `of ${totalSpaces} Total` : "Unpublished (N.A.)";
-        if (fullText.includes("N.A.") && availSpaces === null) {
-          countDisplay = "N.A.";
-          subDisplay = "Data Not Published";
+        // Cell 1: Available Spots (Omit if unverified or N.A.)
+        const hasSpotsData = availSpaces !== null && !fullText.includes("occupancy: not published") && !fullText.includes("occupancy / capacity: not published");
+        if (hasSpotsData) {
+          const spotsCell = el("div", `hud-cell hud-cell-${availStatus}`);
+          let countDisplay = `${availSpaces} Open`;
+          let subDisplay = totalSpaces ? `of ${totalSpaces} Total` : "Available Now";
+          spotsCell.innerHTML = `
+            <div class="hud-label">🟢 Open Spots</div>
+            <div class="hud-value">${countDisplay}</div>
+            <div class="hud-sub">${subDisplay}</div>
+          `;
+          hudGrid.appendChild(spotsCell);
         }
-        spotsCell.innerHTML = `
-          <div class="hud-label">🟢 Open Spots</div>
-          <div class="hud-value">${countDisplay}</div>
-          <div class="hud-sub">${subDisplay}</div>
-        `;
-        hudGrid.appendChild(spotsCell);
 
-        // Cell 2: Parking Rate (Shows dollar rate, or N.A. if unverified/free)
-        const rateCell = el("div", "hud-cell hud-cell-rate");
-        let rateVal = "N.A.";
-        let rateSub = "Rate Unpublished";
-        if (fullText.toLowerCase().includes("free") || fullText.includes("$0")) {
-          rateVal = "Free ($0)";
-          rateSub = "No Charge";
-        } else if (rateMatch) {
-          rateVal = `$${rateMatch[1]}/hr`;
-          rateSub = dailyCapMatch ? `$${dailyCapMatch[1]} max` : "Hourly Rate";
-        } else if (fullText.includes("N.A.")) {
-          rateVal = "N.A.";
-          rateSub = "Fee Unavailable";
+        // Cell 2: Parking Rate (Omit if unverified, missing, or N.A.)
+        const isFree = fullText.toLowerCase().includes("free") || fullText.includes("$0");
+        const hasRateData = rateMatch || isFree;
+        if (hasRateData && !fullText.includes("hourly rate: not published")) {
+          const rateCell = el("div", "hud-cell hud-cell-rate");
+          let rateVal = isFree ? "Free ($0)" : `$${rateMatch[1]}/hr`;
+          let rateSub = isFree ? "No Charge" : (dailyCapMatch ? `$${dailyCapMatch[1]} max` : "Hourly Rate");
+          rateCell.innerHTML = `
+            <div class="hud-label">💵 Hourly Rate</div>
+            <div class="hud-value">${rateVal}</div>
+            <div class="hud-sub">${rateSub}</div>
+          `;
+          hudGrid.appendChild(rateCell);
         }
-        rateCell.innerHTML = `
-          <div class="hud-label">💵 Hourly Rate</div>
-          <div class="hud-value">${rateVal}</div>
-          <div class="hud-sub">${rateSub}</div>
-        `;
-        hudGrid.appendChild(rateCell);
 
-        // Cell 3: EV Stations
-        const evCell = el("div", "hud-cell hud-cell-ev");
-        let evVal = "None";
-        let evSub = "No Charging";
+        // Cell 3: EV Stations (Omit if not present, unverified, or None)
+        let hasEvData = false;
+        let evVal = "";
+        let evSub = "";
         if (evCountMatch) {
           const count = parseInt(evCountMatch[1], 10);
           if (count > 0) {
+            hasEvData = true;
             evVal = `${count} Plugs`;
             evSub = "Available Now";
           }
-        } else if (hasEvText && !noEvText) {
+        } else if (hasEvText && !noEvText && !fullText.includes("ev: n.a.")) {
+          hasEvData = true;
           evVal = "Available";
           evSub = "Charging Stalls";
-        } else if (fullText.includes("N.A.")) {
-          evVal = "N.A.";
-          evSub = "Unverified";
         }
-        evCell.innerHTML = `
-          <div class="hud-label">⚡ EV Stations</div>
-          <div class="hud-value">${evVal}</div>
-          <div class="hud-sub">${evSub}</div>
-        `;
-        hudGrid.appendChild(evCell);
+        if (hasEvData) {
+          const evCell = el("div", "hud-cell hud-cell-ev");
+          evCell.innerHTML = `
+            <div class="hud-label">⚡ EV Stations</div>
+            <div class="hud-value">${evVal}</div>
+            <div class="hud-sub">${evSub}</div>
+          `;
+          hudGrid.appendChild(evCell);
+        }
 
-        // Cell 4: Clearance Height
-        if (clearanceMatch) {
+        // Cell 4: Clearance Height (Omit if not present or unverified)
+        if (clearanceMatch && !fullText.includes("clearance: n.a.")) {
           const clearCell = el("div", "hud-cell hud-cell-clearance");
           const heightStr = clearanceMatch[1];
           const isTight = heightStr.includes("6'2") || heightStr.includes("74");
@@ -892,8 +887,10 @@ function buildNode(id, comps, seen) {
           }
         });
 
-        // Insert HUD grid right after the title / address
-        d.appendChild(hudGrid);
+        // Insert HUD grid right after the title / address (only if at least one verified metric exists)
+        if (hudGrid.children.length > 0) {
+          d.appendChild(hudGrid);
+        }
 
         // Render Driver Tip (Single Clean Box, No Duplication)
         if (tipMatch) {
