@@ -251,21 +251,41 @@
 
   /* Driver HUD: Glanceable Telemetry Grid */
   .driver-hud-grid {
-    display:grid; grid-template-columns:repeat(auto-fit, minmax(110px, 1fr)); gap:0.6rem; margin:0.65rem 0;
+    display:grid; grid-template-columns:repeat(auto-fit, minmax(130px, 1fr)); gap:0.65rem; margin:0.75rem 0;
   }
   .hud-cell {
-    background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:0.5rem 0.6rem; text-align:center;
+    background:#ffffff; border:1.5px solid #e2e8f0; border-radius:12px; padding:0.65rem 0.75rem; text-align:center;
+    box-shadow:0 1px 3px rgba(0,0,0,0.04); transition:all 0.15s ease;
   }
-  .hud-label { font-size:0.68rem; font-weight:700; text-transform:uppercase; color:#64748b; letter-spacing:0.04em; }
-  .hud-value { font-size:1.05rem; font-weight:700; color:#0f172a; margin-top:2px; }
-  .hud-sub { font-size:0.7rem; color:#64748b; }
+  .hud-cell:hover { border-color:#cbd5e1; box-shadow:0 2px 6px rgba(0,0,0,0.06); }
+  .hud-label { font-size:0.7rem; font-weight:700; text-transform:uppercase; color:#64748b; letter-spacing:0.04em; }
+  .hud-value { font-size:1.15rem; font-weight:800; color:#0f172a; margin-top:3px; }
+  .hud-sub { font-size:0.72rem; color:#64748b; margin-top:1px; }
+  
+  /* Status-themed HUD Cells */
+  .hud-cell-available { background:#f0fdf4; border-color:#86efac; }
+  .hud-cell-available .hud-value { color:#15803d; }
+  .hud-cell-available .hud-label { color:#166534; }
+  .hud-cell-filling { background:#fffbeb; border-color:#fde68a; }
+  .hud-cell-filling .hud-value { color:#b45309; }
+  .hud-cell-filling .hud-label { color:#92400e; }
+  .hud-cell-full { background:#fef2f2; border-color:#fecaca; }
+  .hud-cell-full .hud-value { color:#b91c1c; }
+  .hud-cell-full .hud-label { color:#991b1b; }
+
+  .hud-cell-rate { background:#f8fafc; border-color:#cbd5e1; }
+  .hud-cell-rate .hud-value { color:#0f172a; }
+  .hud-cell-ev { background:#f0fdfa; border-color:#99f6e4; }
+  .hud-cell-ev .hud-value { color:#0f766e; }
+  .hud-cell-clearance { background:#faf5ff; border-color:#e9d5ff; }
+  .hud-cell-clearance .hud-value { color:#6b21a8; }
   .hud-warning { background:#fffbeb; border-color:#fde68a; }
   .hud-warning .hud-value { color:#b45309; }
 
   /* Driver Tip & Warning Callouts */
   .driver-callout {
-    border-radius:10px; padding:0.6rem 0.8rem; margin:0.55rem 0; font-size:0.85rem; line-height:1.4;
-    display:flex; align-items:flex-start; gap:0.5rem;
+    border-radius:10px; padding:0.65rem 0.85rem; margin:0.65rem 0; font-size:0.86rem; line-height:1.45;
+    display:flex; align-items:flex-start; gap:0.55rem;
   }
   .callout-tip { background:#f0fdf4; border:1px solid #bbf7d0; color:#166534; }
   .callout-warning { background:#fff1f2; border:1px solid #fecdd3; color:#9f1239; }
@@ -601,56 +621,124 @@ function buildNode(id, comps, seen) {
           titleEl.appendChild(wrap);
         }
 
-        // --- DRIVER HUD UPGRADE: Parse Key Telemetry ---
-        // 1. Rate & Daily Cap
+        // --- DRIVER HUD: Parse Key Telemetry ---
+        // 1. Available Spots & Status
+        let availSpaces = null;
+        let availStatus = "available"; // available, filling, full
+        const spacesMatch = fullText.match(/([0-9]+)\s*(?:spaces?|spots?|stalls?)\s*available/i) || fullText.match(/available(?:\s*spaces?)?[:\s]*([0-9]+)/i);
+        if (spacesMatch) {
+          availSpaces = parseInt(spacesMatch[1], 10);
+          if (availSpaces <= 0) availStatus = "full";
+          else if (availSpaces <= 25) availStatus = "filling";
+          else availStatus = "available";
+        } else if (fullText.toLowerCase().includes("full") || fullText.toLowerCase().includes("no spaces")) {
+          availStatus = "full";
+          availSpaces = 0;
+        }
+
+        // 2. Rate & Daily Cap
         const rateMatch = fullText.match(/\$([0-9]+(?:\.[0-9]{2})?)\s*(?:\/\s*hr|per hour)/i);
         const dailyCapMatch = fullText.match(/daily\s*(?:max|cap)?[:\s]*\$([0-9]+(?:\.[0-9]{2})?)/i) || fullText.match(/\$([0-9]+(?:\.[0-9]{2})?)\s*daily/i);
         
-        // 2. Clearance Height
-        const clearanceMatch = fullText.match(/([0-9]+['’][0-9]+["”]?)/) || fullText.match(/([0-9]{2})\s*inches/i);
-        
         // 3. EV Charging
-        const evMatch = fullText.match(/([0-9]+)\s*(?:ev\s*)?chargers/i) || fullText.match(/ev\s*charging\s*(available|yes|true)?/i);
+        const evMatch = fullText.match(/([0-9]+)\s*(?:ev\s*)?chargers/i) || fullText.match(/ev\s*chargers?[:\s]*([0-9]+)/i);
+        const hasEv = evMatch || fullText.toLowerCase().includes("ev charging: yes") || fullText.toLowerCase().includes("has ev charging");
 
-        // 4. Entry Tip
-        const tipMatch = fullText.match(/entry\s*tip[:\s]+([^.\n]+(?:\.[^.\n]+)?)/i);
+        // 4. Clearance Height
+        const clearanceMatch = fullText.match(/([0-9]+['’][0-9]+["”]?)/) || fullText.match(/([0-9]{2,3})\s*inches/i);
 
-        // Render Driver Telemetry Grid if rate or clearance found
-        if (rateMatch || clearanceMatch) {
-          const hudGrid = el("div", "driver-hud-grid");
-          
-          // Rate Cell
-          if (rateMatch) {
-            const rateCell = el("div", "hud-cell");
-            rateCell.innerHTML = `<div class="hud-label">💵 Hourly Rate</div><div class="hud-value">$${rateMatch[1]}/hr</div><div class="hud-sub">${dailyCapMatch ? `$${dailyCapMatch[1]} max` : 'Standard'}</div>`;
-            hudGrid.appendChild(rateCell);
-          }
-          
-          // Clearance Cell
-          if (clearanceMatch) {
-            const clearCell = el("div", "hud-cell");
-            const heightStr = clearanceMatch[1];
-            const isTight = heightStr.includes("6'2") || heightStr.includes("74");
-            if (isTight) clearCell.classList.add("hud-warning");
-            clearCell.innerHTML = `<div class="hud-label">📏 Clearance</div><div class="hud-value">${heightStr}</div><div class="hud-sub">${isTight ? '⚠️ Low Clearance' : '✓ Normal SUV'}</div>`;
-            hudGrid.appendChild(clearCell);
-          }
+        // 5. Driver Tip (single clean extract, discarding extra "Entry tip:" / "Driver tip:" duplication)
+        const tipMatch = fullText.match(/(?:driver\s*tip|entry\s*tip)[:\s]+([^.\n]+(?:\.[^.\n]+)?)/i);
 
-          // EV Charging Cell
-          if (evMatch) {
-            const evCell = el("div", "hud-cell");
-            const evCount = evMatch[1] && !isNaN(evMatch[1]) ? `${evMatch[1]} Chargers` : 'Available';
-            evCell.innerHTML = `<div class="hud-label">⚡ EV Stations</div><div class="hud-value">${evCount}</div><div class="hud-sub">Level 2 / Fast</div>`;
-            hudGrid.appendChild(evCell);
-          }
+        // Build the 4-Cell Glanceable Driver Telemetry Grid
+        const hudGrid = el("div", "driver-hud-grid");
 
-          d.appendChild(hudGrid);
+        // Cell 1: Available Spots (Clearly highlighted)
+        const spotsCell = el("div", `hud-cell hud-cell-${availStatus}`);
+        let statusBadgeLabel = availStatus === "available" ? "Available" : (availStatus === "filling" ? "Filling Fast" : "Full");
+        let countDisplay = availSpaces !== null ? `${availSpaces} Spots` : statusBadgeLabel;
+        spotsCell.innerHTML = `
+          <div class="hud-label">🟢 Open Spots</div>
+          <div class="hud-value">${countDisplay}</div>
+          <div class="hud-sub">${statusBadgeLabel}</div>
+        `;
+        hudGrid.appendChild(spotsCell);
+
+        // Cell 2: Parking Rate
+        const rateCell = el("div", "hud-cell hud-cell-rate");
+        const rateVal = rateMatch ? `$${rateMatch[1]}/hr` : "Meter / Var";
+        const rateSub = dailyCapMatch ? `$${dailyCapMatch[1]} max` : "Standard Rate";
+        rateCell.innerHTML = `
+          <div class="hud-label">💵 Hourly Rate</div>
+          <div class="hud-value">${rateVal}</div>
+          <div class="hud-sub">${rateSub}</div>
+        `;
+        hudGrid.appendChild(rateCell);
+
+        // Cell 3: EV Stations
+        const evCell = el("div", "hud-cell hud-cell-ev");
+        let evVal = "None";
+        let evSub = "No Charging";
+        if (evMatch) {
+          evVal = `${evMatch[1]} Plugs`;
+          evSub = "Level 2 / Fast";
+        } else if (hasEv) {
+          evVal = "Available";
+          evSub = "Charging Stalls";
+        }
+        evCell.innerHTML = `
+          <div class="hud-label">⚡ EV Stations</div>
+          <div class="hud-value">${evVal}</div>
+          <div class="hud-sub">${evSub}</div>
+        `;
+        hudGrid.appendChild(evCell);
+
+        // Cell 4: Clearance Height
+        if (clearanceMatch) {
+          const clearCell = el("div", "hud-cell hud-cell-clearance");
+          const heightStr = clearanceMatch[1];
+          const isTight = heightStr.includes("6'2") || heightStr.includes("74");
+          if (isTight) clearCell.classList.add("hud-warning");
+          clearCell.innerHTML = `
+            <div class="hud-label">📏 Clearance</div>
+            <div class="hud-value">${heightStr}</div>
+            <div class="hud-sub">${isTight ? '⚠️ Low Clearance' : '✓ Normal SUV'}</div>
+          `;
+          hudGrid.appendChild(clearCell);
         }
 
-        // Render Driver Entry Tip Callout
+        // Clean out redundant child text elements that repeat rate, clearance, ev, and entry tip
+        const textElements = Array.from(d.querySelectorAll(".a2text"));
+        textElements.forEach(t => {
+          const txt = t.textContent.trim().toLowerCase();
+          // Keep title and address
+          if (t.classList.contains("a2-h1") || t.classList.contains("a2-h2") || t.classList.contains("a2-h3") || t.querySelector(".location-hover-wrap")) {
+            return;
+          }
+          if (txt.startsWith("address:") || txt.includes("st,") || txt.includes("ave,") || txt.includes("boulevard") || txt.includes("blvd")) {
+            return;
+          }
+          // Remove duplicates covered by HUD
+          if (
+            txt.includes("hourly rate:") || txt.includes("rate:") || txt.includes("/hr") ||
+            txt.includes("daily max:") ||
+            txt.includes("clearance:") || txt.includes("clearance height:") ||
+            txt.includes("ev charging:") || txt.includes("ev chargers:") ||
+            txt.includes("available spaces:") || txt.includes("occupancy:") || txt.includes("open spaces") ||
+            txt.includes("entry tip:") || txt.includes("driver tip:")
+          ) {
+            t.remove();
+          }
+        });
+
+        // Insert HUD grid right after the title / address
+        d.appendChild(hudGrid);
+
+        // Render Driver Tip (Single Clean Box, No Duplication)
         if (tipMatch) {
           const tipBox = el("div", "driver-callout callout-tip");
-          tipBox.innerHTML = `<span class="callout-icon">💡</span><div><strong>Driver Tip:</strong> ${tipMatch[1].trim()}</div>`;
+          const cleanTip = tipMatch[1].replace(/^(?:driver\s*tip|entry\s*tip)[:\s]*/i, "").trim();
+          tipBox.innerHTML = `<span class="callout-icon">💡</span><div><strong>Driver Tip:</strong> ${cleanTip}</div>`;
           d.appendChild(tipBox);
         }
 
@@ -691,7 +779,7 @@ function buildNode(id, comps, seen) {
               audioBtn.innerHTML = `🔈 Listen`;
               return;
             }
-            const speechText = `${rawTitle}. Hourly rate ${rateMatch ? rateMatch[1] + ' dollars' : ''}. Clearance ${clearanceMatch ? clearanceMatch[1] : 'standard'}. ${tipMatch ? 'Entry tip: ' + tipMatch[1] : ''}`;
+            const speechText = `${rawTitle}. ${availSpaces !== null ? availSpaces + ' spots available.' : ''} Rate ${rateMatch ? rateMatch[1] + ' dollars per hour.' : ''} Clearance ${clearanceMatch ? clearanceMatch[1] : 'standard'}. ${tipMatch ? 'Driver tip: ' + tipMatch[1] : ''}`;
             const utter = new SpeechSynthesisUtterance(speechText);
             utter.rate = 1.05;
             utter.onend = () => {
@@ -745,24 +833,6 @@ function buildNode(id, comps, seen) {
     case "Text": {
       const rawText = boundStr(props.text);
       const hint = String(props.usageHint || "body").toLowerCase();
-      
-      // Smart detection of live occupancy status to render colorful badges
-      if (rawText.toLowerCase().includes("available") || rawText.toLowerCase().includes("occupancy") || rawText.toLowerCase().includes("open spaces") || rawText.toLowerCase().includes("capacity")) {
-        const t = el("div", "a2text");
-        let badgeType = "badge-available";
-        let label = "Available";
-        if (rawText.toLowerCase().includes("low") || rawText.toLowerCase().includes("filling") || rawText.includes("10 spaces") || rawText.includes("5 spaces") || rawText.includes("few")) {
-          badgeType = "badge-filling";
-          label = "Filling Fast";
-        } else if (rawText.toLowerCase().includes("full") || rawText.includes("0 spaces")) {
-          badgeType = "badge-full";
-          label = "Full";
-        }
-        
-        t.innerHTML = `<span class="badge-occupancy ${badgeType}"><span class="status-dot"></span>${label}</span> <span style="font-size:0.9rem; margin-left:0.3rem;">${rawText}</span>`;
-        return t;
-      }
-
       const t = el("div", "a2text");
       if (["h1", "h2", "h3", "h4", "h5", "h6"].includes(hint)) t.classList.add("a2-" + hint);
       else if (hint === "caption") t.classList.add("a2-caption");
