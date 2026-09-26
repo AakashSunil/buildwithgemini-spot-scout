@@ -10,31 +10,27 @@ An intelligent, multi-modal conversational agent that helps drivers navigate San
 
 SpotScout is built using the **Agent Development Kit (ADK)** and the **Gemini 3.6 Flash** model, supported by an array of specialized tools and Google Cloud integrations:
 
-### 1. Parking Search & Real-Time Firestore Database
-- **`search_parking_spots`**: Queries Google Cloud Firestore (`parking_spots` collection) to filter garages, lots, and metered zones by neighborhood/destination, rate, clearance height, and EV charging support.
-- **`check_spot_occupancy_status`**: Reads live occupancy metrics, open space counts, and full/available status directly from Firestore.
-- **`get_parking_spot_details`**: Retrieves comprehensive spot metadata (exact street address, vehicle height limits, security level, operating hours).
-- **`calculate_parking_fee`**: Calculates tiered parking totals based on hourly rates, daily maximums, early bird discounts, and requested stay duration.
-- **`add_parking_spot` & `update_spot_availability`**: Dynamically onboards new parking facilities or updates available space counts in Firestore.
-- **`list_supported_cities`**: Lists active and planned coverage areas.
+### 1. Dynamic Web Grounding & Worldwide Real-Time Search (Zero Hardcoding)
+- **`google_search`**: Grounded with Google Search to dynamically verify official municipal tariffs, entrance overhead clearances (e.g., 6'5", 6'8", 7'2"), operating hours, and daily caps for ANY city or landmark worldwide directly from official garage operators and city transportation agencies.
+- **`search_parking_spots`**: Dynamically queries OpenStreetMap (OSM) / Nominatim APIs to discover real-world parking garages and surface facilities around any address or landmark without hardcoded database entries.
+- **`lookup_destination_coordinates`**: Resolves landmarks, venues, and street intersections into precise geographic coordinates worldwide.
+- **`get_current_time`**: Evaluates active local time to account for time-sensitive parking rules and evening/weekend rate tiers.
 
-### 2. Destination Geocoding & Local Time
-- **`lookup_destination_coordinates`**: Resolves San Francisco neighborhoods, landmarks, and street intersections into geographic coordinates and standardized bounding areas.
-- **`get_current_time`**: Evaluates active local time in `America/Los_Angeles` to account for time-sensitive parking rules and evening/weekend rate tiers.
-
-### 3. Long-Term Cross-Session Memory (Vertex AI Memory Bank)
-- **`PreloadMemoryTool`**: Injects relevant past facts and preferences (such as EV vs. gas vehicle type, vehicle clearance height, budget tolerances, and frequent destinations like SoMa or Union Square) into the agent's context at the start of a conversation.
+### 2. Long-Term Cross-Session Memory (Vertex AI Memory Bank)
+- **`PreloadMemoryTool`**: Injects relevant past facts and preferences (such as EV vs. gas vehicle type, vehicle clearance height, budget tolerances, and frequent destinations) into the agent's context at the start of a conversation.
 - **`generate_memories_callback`**: Executes after each conversation turn to distill durable driver preferences and persist them to the managed Vertex AI Memory Bank.
 
-### 4. Interactive Display UI (A2UI)
-- Uses an **`after_model_callback` (`a2ui_callback`)** to intercept and translate model output into rich, structured A2UI display cards and tables:
-  - Parking spot summary cards with rate tags, distance, and amenity badges.
-  - Side-by-side comparison tables evaluating rates, clearance, and features across multiple garages.
+### 3. Interactive Display UI (A2UI) & Dynamic Driver HUD
+- Uses an **`after_model_callback` (`a2ui_callback`)** and custom web frontend to intercept and translate model output into rich, structured A2UI display cards:
+  - **Dynamic Telemetry Grid**: Automatically shows verified Hourly Rate, Total Physical Capacity, EV Plugs, and Vehicle Clearance.
+  - **Dynamic Omission**: Telemetry cells with unverified data (`N.A.`) are cleanly omitted, presenting drivers with only verified truths.
+  - **Option A Transparency**: Never fabricates static open stall counts; displays known physical capacity and notes that live slots fluctuate.
+  - **Direct Google Maps Navigation**: One-tap navigation button directly opens turn-by-turn directions to the verified address.
 
-### 5. Official Parking Regulations & Municipal Knowledge Base (Vertex AI RAG Engine)
+### 4. Official Parking Regulations & Municipal Knowledge Base (Vertex AI RAG Engine)
 - **`consult_sf_parking_regulations`**: Searches an official SFMTA municipal regulations corpus managed in Vertex AI RAG Engine (serverless mode with `text-embedding-005` in `us-central1`). Grounded on official curb color codes, street sweeping schedules, 72-hour limits, driveway clearance, and hill wheel curbing laws.
 
-### 6. Multi-Modal Visuals & Video Generation (Cloud Storage)
+### 5. Multi-Modal Visuals & Video Generation (Cloud Storage)
 - **`generate_parking_spot_visual`**: Generates high-resolution entrance and signage images using **`gemini-3.1-flash-lite-image`** in the `global` region. Saves the image as a session artifact in ADK and streams the image bytes directly to a public Google Cloud Storage bucket (`spot-scout-qwiklabs-gcp-03-d27323349804`).
 - **`generate_parking_spot_video`**: Generates 3-second entrance approach videos using Google's Omni model (**`gemini-omni-flash-preview`**) via the Interactions API. Persists the video via `tool_context.save_artifact` and uploads bytes to Cloud Storage, returning a public HTTPS URL.
 
@@ -45,21 +41,15 @@ SpotScout is built using the **Agent Development Kit (ADK)** and the **Gemini 3.
 | Service | Purpose | Implementation |
 |---|---|---|
 | **Gemini 3.6 Flash** | Core reasoning, conversational logic, and tool orchestration | `google.adk.models.Gemini` |
+| **Google Search Grounding** | Dynamic real-time verification of clearance heights, official tariffs, and hours worldwide | `google.adk.tools.google_search` |
+| **OpenStreetMap & Nominatim** | Worldwide geographic amenity and facility discovery | Dynamic OSM API queries |
 | **Vertex AI RAG Engine** | Grounding on official SF municipal parking and curb regulations | Serverless Vector Search + `text-embedding-005` in `us-central1` |
 | **Vertex AI Memory Bank** | Long-term memory across sessions | `PreloadMemoryTool` & `add_session_to_memory()` |
-| **Cloud Firestore** | Real-time parking catalog, live occupancy, and rates | `google.cloud.firestore.Client` |
 | **Cloud Storage** | Public hosting for generated entrance visuals and videos | `google.cloud.storage.Client` |
+| **Cloud Run** | Serverless hosting for the web chat frontend and A2A proxy | Fully managed Cloud Run container |
 | **Gemini 3.1 Flash Lite Image** | Exterior architectural entrance and signage generation | `genai.Client(location="global")` |
 | **Gemini Omni Flash Preview** | Dynamic approach video generation | `genai.Client.interactions.create` |
 | **A2A (Agent-to-Agent Protocol)** | Protocol bridging frontend chat interface to ADK Agent Runtime | FastAPI async proxy streaming SSE events |
-
----
-
-## Planned Capabilities (Not Yet Implemented)
-
-The following features from the initial project design brief are currently roadmap items:
-- **SFMTA Open Data API Integration**: Real-time integration with live city street sweeping sensors and parking meters *(currently simulated via Firestore)*.
-- **Python Code Execution Sandbox**: Running custom mathematical optimization scripts for meter expiration curves.
 
 ---
 

@@ -21,6 +21,7 @@ from google.adk.agents import Agent
 from google.adk.agents.callback_context import CallbackContext
 from google.adk.apps import App
 from google.adk.models import Gemini
+from google.adk.tools import google_search
 from google.adk.tools.preload_memory_tool import PreloadMemoryTool
 from google.genai import types
 
@@ -71,6 +72,7 @@ root_agent = Agent(
     instruction=SPOT_SCOUT_A2UI_INSTRUCTIONS,
     tools=[
         PreloadMemoryTool(),
+        google_search,
         lookup_destination_coordinates,
         consult_sf_parking_regulations,
         generate_parking_spot_visual,
