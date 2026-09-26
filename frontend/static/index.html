@@ -357,6 +357,80 @@
     position:absolute; top:12px; right:12px; background:rgba(0,0,0,0.6); color:#fff;
     border:none; border-radius:50%; width:36px; height:36px; font-size:1.2rem; cursor:pointer;
     display:flex; align-items:center; justify-content:center;
+  /* In-Car Driver HUD Mode (Automotive / Landscape / High Contrast) */
+  .hud-mode-toggle {
+    background:rgba(255,255,255,0.15); border:1px solid rgba(255,255,255,0.3); color:#fff;
+    padding:0.4rem 0.85rem; border-radius:20px; font-size:0.8rem; font-weight:700;
+    cursor:pointer; display:inline-flex; align-items:center; gap:0.4rem; transition:all 0.2s ease;
+  }
+  .hud-mode-toggle:hover { background:rgba(255,255,255,0.25); transform:scale(1.02); }
+  .hud-mode-toggle.active { background:#f59e0b; border-color:#d97706; color:#0f172a; box-shadow:0 0 12px rgba(245,158,11,0.6); }
+
+  body.driver-hud-active {
+    --bg: #090d16;
+    --card-bg: #131b2e;
+    --border: #24324f;
+    --text-primary: #f8fafc;
+    --text-secondary: #94a3b8;
+    --agent-bubble: #131b2e;
+  }
+  body.driver-hud-active header {
+    background: #090d16;
+    border-bottom: 2px solid #24324f;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.6);
+  }
+  body.driver-hud-active #log {
+    max-width: 1000px;
+    padding: 1.5rem;
+  }
+  body.driver-hud-active .bubble {
+    font-size: 1.15rem;
+    line-height: 1.6;
+    border: 1px solid #24324f;
+  }
+  body.driver-hud-active .driver-hud-grid {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1rem;
+    margin: 1.2rem 0;
+  }
+  body.driver-hud-active .hud-cell {
+    padding: 1rem;
+    border-width: 2px;
+  }
+  body.driver-hud-active .hud-value {
+    font-size: 1.5rem;
+  }
+  body.driver-hud-active .hud-btn {
+    padding: 0.85rem 1.4rem;
+    font-size: 1.05rem;
+    border-radius: 12px;
+    font-weight: 700;
+  }
+  body.driver-hud-active .driver-callout {
+    font-size: 1.1rem;
+    padding: 1rem 1.25rem;
+    border-left-width: 6px;
+  }
+  body.driver-hud-active #form {
+    padding: 1rem 1.6rem;
+    background: #0f172a;
+    border-top: 2px solid #24324f;
+  }
+  body.driver-hud-active #input {
+    font-size: 1.1rem;
+    padding: 0.9rem 1.2rem;
+    background: #1e293b;
+    border-color: #334155;
+    color: #fff;
+  }
+  body.driver-hud-active .mic-btn {
+    width: 50px;
+    height: 50px;
+    font-size: 1.4rem;
+  }
+  body.driver-hud-active .send-btn {
+    padding: 0.9rem 1.8rem;
+    font-size: 1.1rem;
   }
 </style>
 </head>
@@ -366,7 +440,10 @@
     <span>🧭 SpotScout</span>
     <span class="header-badge">San Francisco</span>
   </div>
-  <div style="font-size:0.85rem; font-weight:500; opacity:0.9;">Smart City Parking Finder</div>
+  <div style="display:flex; align-items:center; gap:0.75rem;">
+    <button type="button" class="hud-mode-toggle" id="hudToggle" title="Toggle In-Car Driver HUD Mode">🚗 Driver HUD</button>
+    <div style="font-size:0.85rem; font-weight:500; opacity:0.9;">Smart City Parking</div>
+  </div>
 </header>
 
 <div class="filter-bar">
@@ -1031,6 +1108,32 @@ document.querySelectorAll(".quick-chip").forEach(chip => {
       form.requestSubmit();
     }
   });
+});
+
+// In-Car Driver HUD Mode Toggle
+const hudToggle = document.getElementById("hudToggle");
+let isHudActive = localStorage.getItem("spotscout_hud_mode") === "true";
+
+function setHudMode(active) {
+  isHudActive = active;
+  document.body.classList.toggle("driver-hud-active", active);
+  if (hudToggle) {
+    hudToggle.classList.toggle("active", active);
+    hudToggle.innerHTML = active ? "🚗 Driver HUD: ON" : "🚗 Driver HUD";
+  }
+  localStorage.setItem("spotscout_hud_mode", active ? "true" : "false");
+}
+
+if (hudToggle) {
+  setHudMode(isHudActive);
+  hudToggle.addEventListener("click", () => {
+    setHudMode(!isHudActive);
+  });
+}
+
+// Auto-activate HUD Mode in landscape orientation on mobile/tablet automotive displays
+window.matchMedia("(orientation: landscape) and (max-height: 600px)").addEventListener("change", (e) => {
+  if (e.matches) setHudMode(true);
 });
 
 // PWA Service Worker Registration
