@@ -785,11 +785,14 @@ function buildNode(id, comps, seen) {
         // Build the 4-Cell Glanceable Driver Telemetry Grid
         const hudGrid = el("div", "driver-hud-grid");
 
-        // Cell 1: Available Spots (Clearly highlighted with exact numbers)
+        // Cell 1: Available Spots (Shows exact count, or N.A. if unverified/unavailable)
         const spotsCell = el("div", `hud-cell hud-cell-${availStatus}`);
-        let statusBadgeLabel = availStatus === "available" ? "Available" : (availStatus === "filling" ? "Filling Fast" : "Full");
-        let countDisplay = availSpaces !== null ? `${availSpaces} Open` : statusBadgeLabel;
-        let subDisplay = totalSpaces ? `of ${totalSpaces} Total` : statusBadgeLabel;
+        let countDisplay = availSpaces !== null ? `${availSpaces} Open` : "N.A.";
+        let subDisplay = totalSpaces ? `of ${totalSpaces} Total` : "Unpublished (N.A.)";
+        if (fullText.includes("N.A.") && availSpaces === null) {
+          countDisplay = "N.A.";
+          subDisplay = "Data Not Published";
+        }
         spotsCell.innerHTML = `
           <div class="hud-label">🟢 Open Spots</div>
           <div class="hud-value">${countDisplay}</div>
@@ -797,10 +800,20 @@ function buildNode(id, comps, seen) {
         `;
         hudGrid.appendChild(spotsCell);
 
-        // Cell 2: Parking Rate
+        // Cell 2: Parking Rate (Shows dollar rate, or N.A. if unverified/free)
         const rateCell = el("div", "hud-cell hud-cell-rate");
-        const rateVal = rateMatch ? `$${rateMatch[1]}/hr` : "Standard";
-        const rateSub = dailyCapMatch ? `$${dailyCapMatch[1]} max` : "Hourly Rate";
+        let rateVal = "N.A.";
+        let rateSub = "Rate Unpublished";
+        if (fullText.toLowerCase().includes("free") || fullText.includes("$0")) {
+          rateVal = "Free ($0)";
+          rateSub = "No Charge";
+        } else if (rateMatch) {
+          rateVal = `$${rateMatch[1]}/hr`;
+          rateSub = dailyCapMatch ? `$${dailyCapMatch[1]} max` : "Hourly Rate";
+        } else if (fullText.includes("N.A.")) {
+          rateVal = "N.A.";
+          rateSub = "Fee Unavailable";
+        }
         rateCell.innerHTML = `
           <div class="hud-label">💵 Hourly Rate</div>
           <div class="hud-value">${rateVal}</div>
@@ -821,6 +834,9 @@ function buildNode(id, comps, seen) {
         } else if (hasEvText && !noEvText) {
           evVal = "Available";
           evSub = "Charging Stalls";
+        } else if (fullText.includes("N.A.")) {
+          evVal = "N.A.";
+          evSub = "Unverified";
         }
         evCell.innerHTML = `
           <div class="hud-label">⚡ EV Stations</div>

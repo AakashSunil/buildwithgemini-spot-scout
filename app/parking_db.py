@@ -116,59 +116,26 @@ def search_parking_spots(
                         continue
 
                     spot_id = f"osm-{item.get('osm_id', abs(hash(item['name']))) % 1000000}"
-                    # Deterministic hash seed based on spot name/id for reproducible diverse attributes
-                    seed = abs(hash(item['name']))
-                    
-                    # Diversified Capacity (from small 45-space surface lots to massive 750-space central garages)
-                    cap_options = [65, 120, 240, 380, 520, 680]
-                    est_total = cap_options[seed % len(cap_options)]
-                    
-                    # Diversified Real-World Hourly Rates based on City & Location Tier
-                    if "new_york" in normalized_city or "nyc" in normalized_city or "manhattan" in normalized_city:
-                        rate_choices = [5.50, 6.75, 8.00, 9.50, 11.00]
-                    elif "san_francisco" in normalized_city:
-                        rate_choices = [3.50, 4.25, 5.00, 6.00, 7.50]
-                    elif "san_jose" in normalized_city or "silicon_valley" in normalized_city:
-                        rate_choices = [2.00, 2.75, 3.50, 4.00, 5.00]
-                    else:
-                        rate_choices = [2.50, 3.25, 4.00, 4.75, 5.50]
-                    # Check for suburban retail centers, strip plazas, and commercial shopping centers (e.g., Milpitas Square, plazas)
-                    is_shopping_plaza = any(k in item["name"].lower() or k in item["address"].lower() or (neighborhood and k in neighborhood.lower()) for k in ["barber", "milpitas square", "plaza", "center", "square", "mall", "market"]) and ("san_francisco" not in normalized_city and "manhattan" not in normalized_city and "new_york" not in normalized_city)
-                    
-                    if is_shopping_plaza:
-                        est_rate = 0.00
-                        daily_max = 0.00
-                        # Free plazas fill up quickly in front, but have hidden overflow stalls around the sides/back
-                        driver_tip = f"Customer parking is free. The front lot fills quickly; look for hidden side pockets and overflow stalls behind the restaurants off Barber Lane."
-                    else:
-                        est_rate = rate_choices[seed % len(rate_choices)]
-                        daily_max = round(est_rate * (6.5 if seed % 2 == 0 else 7.5), 2)
-                        driver_tip = f"Direct street access from {item['address'].split(',')[0] if ',' in item['address'] else item['address']}."
-
+                    # DO NOT invent synthetic rates or capacities, and DO NOT store synthetic entries into Firestore
+                    # If specific rate or place occupancy is not verified in source data, explicitly mark as None so it displays "N.A."
                     dynamic_spot = {
                         "id": spot_id,
                         "name": item["name"],
-                        "address": item["address"],
+                        "address": item["address"] or "N.A.",
                         "city": normalized_city,
-                        "neighborhood": item["neighborhood"] or neighborhood,
-                        "hourly_rate": est_rate,
-                        "daily_max": daily_max,
-                        "spot_type": "surface_lot" if est_total <= 100 or is_shopping_plaza else "garage",
-                        "clearance_height_inches": clearance_in,
-                        "has_ev_charging": has_ev,
-                        "ev_chargers_count": ev_count,
-                        "covered": est_total > 100 and not is_shopping_plaza,
-                        "security_level": "high" if est_total > 300 else "medium",
-                        "total_spaces": est_total,
-                        "available_spaces": avail,
-                        "driver_tip": driver_tip,
+                        "neighborhood": item["neighborhood"] or neighborhood or "N.A.",
+                        "hourly_rate": None,
+                        "daily_max": None,
+                        "spot_type": "surface_lot",
+                        "clearance_height_inches": None,
+                        "has_ev_charging": False,
+                        "ev_chargers_count": 0,
+                        "covered": False,
+                        "security_level": "N.A.",
+                        "total_spaces": None,
+                        "available_spaces": None,
+                        "driver_tip": f"Location: {item['address'] if item['address'] else 'N.A.'}. Specific real-time rates or capacity not published (N.A.).",
                     }
-
-                    # Cache in Firestore for high speed future queries
-                    try:
-                        db.collection("parking_spots").document(spot_id).set(dynamic_spot)
-                    except Exception:
-                        pass
 
                     results.append(dynamic_spot)
                     if len(results) >= 4:
@@ -309,9 +276,23 @@ def calculate_parking_fee(
         return {"error": f"Parking spot '{spot_id}' not found."}
 
     spot = doc.to_dict()
-    hourly_rate = float(spot.get("hourly_rate", 0.0))
-    daily_max = float(spot.get("daily_max", 0.0))
+    hourly_rate = spot.get("hourly_rate")
+    daily_max = spot.get("daily_max")
     spot_name = spot.get("name", spot_id)
+
+    if hourly_rate is None:
+        return {
+            "spot_id": spot_id,
+            "spot_name": spot_name,
+            "duration_hours": duration_hours,
+            "hourly_rate": "N.A.",
+            "daily_max": "N.A.",
+            "total_estimated_fee": "N.A.",
+            "note": "Pricing information is not available (N.A.) for this location.",
+        }
+
+    hourly_rate = float(hourly_rate)
+    daily_max = float(daily_max) if daily_max is not None else 0.0
 
     # Standard hourly calculation
     raw_cost = round(hourly_rate * duration_hours, 2)
@@ -362,30 +343,43 @@ def check_spot_occupancy_status(
         return {"error": f"Parking spot '{spot_id}' not found."}
 
     spot = doc.to_dict()
-    total_spaces = int(spot.get("total_spaces", 0))
-    available_spaces = int(spot.get("available_spaces", 0))
+    total_spaces = spot.get("total_spaces")
+    available_spaces = spot.get("available_spaces")
     name = spot.get("name", spot_id)
     neighborhood = spot.get("neighborhood", "")
 
-    if total_spaces <= 0:
-        occupancy_pct = 0.0
-        status = "unknown"
-    else:
-        occupied_spaces = max(0, total_spaces - available_spaces)
-        occupancy_pct = round((occupied_spaces / total_spaces) * 100, 1)
+    if total_spaces is None or available_spaces is None or total_spaces <= 0:
+        return {
+            "spot_id": spot_id,
+            "name": name,
+            "neighborhood": neighborhood,
+            "total_spaces": "N.A.",
+            "available_spaces": "N.A.",
+            "occupancy_rate_percent": "N.A.",
+            "status": "N.A.",
+            "status_message": "Real-time occupancy data is not published (N.A.) for this location.",
+            "has_ev_charging": spot.get("has_ev_charging", False),
+            "ev_chargers_count": spot.get("ev_chargers_count", 0),
+            "entry_tip": spot.get("entry_tip", ""),
+        }
 
-        if available_spaces <= 0:
-            status = "full"
-            status_message = "Garage is FULL. No stalls currently available."
-        elif available_spaces <= 15 or occupancy_pct >= 90:
-            status = "almost_full"
-            status_message = "Almost full! Few stalls remaining. High likelihood of having to wait or hunt."
-        elif occupancy_pct >= 70:
-            status = "filling_up"
-            status_message = "Filling up steadily. Stalls available on upper/inner levels."
-        else:
-            status = "ample"
-            status_message = "Ample parking available. Easy entry and open stalls."
+    total_spaces = int(total_spaces)
+    available_spaces = int(available_spaces)
+    occupied_spaces = max(0, total_spaces - available_spaces)
+    occupancy_pct = round((occupied_spaces / total_spaces) * 100, 1)
+
+    if available_spaces <= 0:
+        status = "full"
+        status_message = "Garage is FULL. No stalls currently available."
+    elif available_spaces <= 15 or occupancy_pct >= 90:
+        status = "almost_full"
+        status_message = "Almost full! Few stalls remaining. High likelihood of having to wait or hunt."
+    elif occupancy_pct >= 70:
+        status = "filling_up"
+        status_message = "Filling up steadily. Stalls available on upper/inner levels."
+    else:
+        status = "ample"
+        status_message = "Ample parking available. Easy entry and open stalls."
 
     return {
         "spot_id": spot_id,
