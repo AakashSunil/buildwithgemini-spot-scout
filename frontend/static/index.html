@@ -38,12 +38,24 @@
   .a2divider { border:none; border-top:1px solid var(--border); margin:.4rem 0; width:100%; }
   .a2img { max-width:100%; border-radius:8px; display:block; }
   .material-symbols-outlined { font-family:'Material Symbols Outlined'; font-size:1.25rem; line-height:1; vertical-align:middle; color:var(--accent); }
+
+  /* Quick example prompt chips */
+  .quick-prompts { display:flex; gap:.5rem; padding:.6rem 1rem 0; background:#fff; overflow-x:auto; }
+  .quick-chip { background:#f1f5f9; border:1px solid var(--border); border-radius:16px; padding:.4rem .8rem; font-size:.82rem; color:#334155; cursor:pointer; white-space:nowrap; transition:all .15s ease; }
+  .quick-chip:hover { background:#e2e8f0; color:#0f172a; border-color:#cbd5e1; }
 </style>
 </head>
 <body>
 <header>SpotScout (Smart City Parking Finder)</header>
 
 <div id="log"></div>
+
+<div class="quick-prompts">
+  <button type="button" class="quick-chip" data-prompt="Find parking near Union Square for 3 hours with clearance above 6ft 6in">🅿️ Union Square (3 hrs, &gt;6ft 6in)</button>
+  <button type="button" class="quick-chip" data-prompt="Check live occupancy and clearance for Sutter-Stockton Garage, and generate an entrance guide image">📷 Sutter-Stockton Live Status &amp; Entrance</button>
+  <button type="button" class="quick-chip" data-prompt="What are SF parking regulations for yellow curb loading and parking on steep hills?">📜 SF Curb Rules &amp; Hill Parking Laws</button>
+</div>
+
 <form id="form">
   <input id="input" placeholder="Ask something…" autocomplete="off" autofocus>
   <button>Send</button>
@@ -203,6 +215,17 @@ form.addEventListener("submit", async (ev) => {
   } catch (e) {
     b.textContent = "Error: " + e.message;
   }
+});
+
+// Clickable example prompt chips
+document.querySelectorAll(".quick-chip").forEach(chip => {
+  chip.addEventListener("click", () => {
+    const prompt = chip.getAttribute("data-prompt");
+    if (prompt) {
+      input.value = prompt;
+      form.requestSubmit();
+    }
+  });
 });
 </script>
 </body>
