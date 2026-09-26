@@ -2,8 +2,15 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SpotScout (Smart City Parking Finder)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>SpotScout - Smart City Parking Finder</title>
+<!-- PWA & Mobile Meta Tags -->
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#0d9488">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="SpotScout">
+<link rel="apple-touch-icon" href="/icon-192.png">
 <!-- Optional: used only to draw A2UI Icon components. If it can't load (offline/
      corp network), icons fall back to showing their name as text. -->
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined">
@@ -1025,6 +1032,15 @@ document.querySelectorAll(".quick-chip").forEach(chip => {
     }
   });
 });
+
+// PWA Service Worker Registration
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("/sw.js")
+      .then(reg => console.log("SpotScout PWA Service Worker registered:", reg.scope))
+      .catch(err => console.warn("PWA Service Worker registration failed:", err));
+  });
+}
 </script>
 </body>
 </html>

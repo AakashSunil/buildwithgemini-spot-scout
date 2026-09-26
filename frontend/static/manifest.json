@@ -1,0 +1,26 @@
+{
+  "name": "SpotScout - Smart City Parking Finder",
+  "short_name": "SpotScout",
+  "description": "Intelligent hands-free parking finder for drivers with live occupancy, height clearance checks, and navigation.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0f172a",
+  "theme_color": "#0ea5e9",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["navigation", "utilities", "travel"]
+}
