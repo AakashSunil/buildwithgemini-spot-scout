@@ -491,34 +491,65 @@ document.addEventListener("keydown", (e) => {
 });
 
 // Curated high-resolution architectural & street entrance previews for San Francisco garages
+// Each spot now has distinct photos:
+// - entrance: street-level vehicle entryway & clearance signage
+// - facility: parking structure overview, layout, or interior lot
 const SPOT_PREVIEWS = {
   "sutter": {
-    url: "https://images.unsplash.com/photo-1590674899484-d5640e854abe?auto=format&fit=crop&w=800&q=80",
-    label: "Sutter-Stockton Garage Entrance"
+    entranceUrl: "https://images.unsplash.com/photo-1590674899484-d5640e854abe?auto=format&fit=crop&w=800&q=80",
+    facilityUrl: "https://images.unsplash.com/photo-1506521781263-d8422e82f27a?auto=format&fit=crop&w=800&q=80",
+    label: "Sutter-Stockton Garage",
+    entranceLabel: "Sutter-Stockton Driveway Entrance",
+    facilityLabel: "Multi-Level Parking Facility"
   },
   "stockton": {
-    url: "https://images.unsplash.com/photo-1590674899484-d5640e854abe?auto=format&fit=crop&w=800&q=80",
-    label: "Sutter-Stockton Garage Entrance"
+    entranceUrl: "https://images.unsplash.com/photo-1590674899484-d5640e854abe?auto=format&fit=crop&w=800&q=80",
+    facilityUrl: "https://images.unsplash.com/photo-1506521781263-d8422e82f27a?auto=format&fit=crop&w=800&q=80",
+    label: "Sutter-Stockton Garage",
+    entranceLabel: "Stockton St Entrance & Clearance Gate",
+    facilityLabel: "Garage Interior & EV Stalls"
+  },
+  "fifth": {
+    entranceUrl: "https://images.unsplash.com/photo-1573348722427-f1d6819fdf98?auto=format&fit=crop&w=800&q=80",
+    facilityUrl: "https://images.unsplash.com/photo-1526778548025-fa2f459cd5c1?auto=format&fit=crop&w=800&q=80",
+    label: "Fifth & Mission / Yerba Buena Garage",
+    entranceLabel: "Mission St Main Ramp Entrance",
+    facilityLabel: "Yerba Buena Covered Parking Levels"
   },
   "mission": {
-    url: "https://images.unsplash.com/photo-1506521781263-d8422e82f27a?auto=format&fit=crop&w=800&q=80",
-    label: "Fifth & Mission / Yerba Buena Garage"
+    entranceUrl: "https://images.unsplash.com/photo-1573348722427-f1d6819fdf98?auto=format&fit=crop&w=800&q=80",
+    facilityUrl: "https://images.unsplash.com/photo-1526778548025-fa2f459cd5c1?auto=format&fit=crop&w=800&q=80",
+    label: "Fifth & Mission / Yerba Buena Garage",
+    entranceLabel: "Mission St Vehicle Entrance",
+    facilityLabel: "Yerba Buena Parking Structure"
   },
   "portsmouth": {
-    url: "https://images.unsplash.com/photo-1573348722427-f1d6819fdf98?auto=format&fit=crop&w=800&q=80",
-    label: "Portsmouth Square Plaza Underground"
+    entranceUrl: "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=800&q=80",
+    facilityUrl: "https://images.unsplash.com/photo-1568605117036-5fe5e7bab0b7?auto=format&fit=crop&w=800&q=80",
+    label: "Portsmouth Square Plaza Garage",
+    entranceLabel: "Kearny St Underground Entrance (6'2\" Clearance)",
+    facilityLabel: "Portsmouth Plaza Underground Layout"
   },
   "valencia": {
-    url: "https://images.unsplash.com/photo-1517524008697-84bbe3c3fd98?auto=format&fit=crop&w=800&q=80",
-    label: "Valencia St Corridor Street Parking"
+    entranceUrl: "https://images.unsplash.com/photo-1517524008697-84bbe3c3fd98?auto=format&fit=crop&w=800&q=80",
+    facilityUrl: "https://images.unsplash.com/photo-1549465220-1a8b9238cd48?auto=format&fit=crop&w=800&q=80",
+    label: "Valencia Corridor Parking",
+    entranceLabel: "16th & Valencia Street Curbside Parking",
+    facilityLabel: "Mission District Neighborhood Street View"
   },
   "marina": {
-    url: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=800&q=80",
-    label: "Marina Green Surface Parking Lot"
+    entranceUrl: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=800&q=80",
+    facilityUrl: "https://images.unsplash.com/photo-1470240731273-7821a6eeb6bd?auto=format&fit=crop&w=800&q=80",
+    label: "Marina Green East Parking Lot",
+    entranceLabel: "Marina Blvd Surface Lot Entryway",
+    facilityLabel: "Marina Green Waterfront Parking Bays"
   },
   "union": {
-    url: "https://images.unsplash.com/photo-1526778548025-fa2f459cd5c1?auto=format&fit=crop&w=800&q=80",
-    label: "Union Square Plaza Garage"
+    entranceUrl: "https://images.unsplash.com/photo-1526778548025-fa2f459cd5c1?auto=format&fit=crop&w=800&q=80",
+    facilityUrl: "https://images.unsplash.com/photo-1506521781263-d8422e82f27a?auto=format&fit=crop&w=800&q=80",
+    label: "Union Square Plaza Garage",
+    entranceLabel: "Geary St Entrance Ramp",
+    facilityLabel: "Union Square Underground Parking Level"
   }
 };
 
@@ -528,10 +559,13 @@ function getPreviewImageForSpot(name) {
   for (const [key, item] of Object.entries(SPOT_PREVIEWS)) {
     if (lower.includes(key)) return item;
   }
-  // Default street parking entrance preview
+  // Default SF parking preview
   return {
-    url: "https://images.unsplash.com/photo-1506521781263-d8422e82f27a?auto=format&fit=crop&w=800&q=80",
-    label: "San Francisco Parking Facility"
+    entranceUrl: "https://images.unsplash.com/photo-1590674899484-d5640e854abe?auto=format&fit=crop&w=800&q=80",
+    facilityUrl: "https://images.unsplash.com/photo-1506521781263-d8422e82f27a?auto=format&fit=crop&w=800&q=80",
+    label: "San Francisco Parking Facility",
+    entranceLabel: "Vehicle Driveway Entrance",
+    facilityLabel: "Facility Overview"
   };
 }
 
@@ -603,18 +637,18 @@ function buildNode(id, comps, seen) {
         const rawTitle = titleEl.textContent.trim().replace(/[🅿️🧭📍⭐✅⚠️]/g, "").trim();
         const destQuery = encodeURIComponent(rawTitle + " San Francisco, CA");
         
-        // Wrap title in hoverable preview trigger
+        // Wrap title in hoverable preview trigger (Street-level Driveway Entrance)
         const spotImageMatch = getPreviewImageForSpot(rawTitle);
         if (spotImageMatch) {
           const wrap = el("div", "location-hover-wrap");
           const titleSpan = el("span", "location-hover-title", titleEl.textContent);
           const popover = el("div", "location-preview-popover");
-          popover.innerHTML = `<img src="${spotImageMatch.url}" alt="${rawTitle}"><div class="location-preview-caption">📷 ${spotImageMatch.label} (Click to expand)</div>`;
+          popover.innerHTML = `<img src="${spotImageMatch.entranceUrl}" alt="${rawTitle}"><div class="location-preview-caption">🚪 ${spotImageMatch.entranceLabel} (Click to expand)</div>`;
           wrap.appendChild(titleSpan);
           wrap.appendChild(popover);
           
           wrap.addEventListener("click", () => {
-            openLightbox(spotImageMatch.url);
+            openLightbox(spotImageMatch.entranceUrl);
           });
           
           titleEl.textContent = "";
@@ -829,12 +863,13 @@ function buildNode(id, comps, seen) {
         });
         actionsBar.appendChild(copyBtn);
 
-        // 4. View Photo Button if preview available
-        if (spotImageMatch) {
+        // 4. View Facility Photo Button (Distinct indoor/overview image, not repeating the entrance)
+        if (spotImageMatch && spotImageMatch.facilityUrl) {
           const photoBtn = el("button", "hud-btn hud-btn-secondary");
           photoBtn.type = "button";
-          photoBtn.innerHTML = `📷 Entrance Photo`;
-          photoBtn.addEventListener("click", () => openLightbox(spotImageMatch.url));
+          photoBtn.innerHTML = `🏢 Facility View`;
+          photoBtn.title = spotImageMatch.facilityLabel;
+          photoBtn.addEventListener("click", () => openLightbox(spotImageMatch.facilityUrl));
           actionsBar.appendChild(photoBtn);
         }
 
