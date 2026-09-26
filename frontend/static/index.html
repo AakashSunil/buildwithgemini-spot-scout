@@ -92,36 +92,7 @@
   /* When the reply is an A2UI card, drop the bubble chrome so the card stands alone with full beauty */
   .bubble.rich { background:transparent; border:none; box-shadow:none; padding:0; max-width:100%; white-space:normal; }
   
-  /* Quick example prompt chips */
-  .quick-prompts-container {
-    max-width:840px; width:100%; margin:0 auto; padding:0.5rem 1rem 0;
-    display:flex; flex-direction:column; gap:0.4rem;
-  }
-  .quick-title { font-size:0.75rem; font-weight:600; color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.04em; }
-  .quick-prompts { display:flex; gap:0.6rem; overflow-x:auto; padding-bottom:0.3rem; scrollbar-width:thin; }
-  .quick-chip {
-    background:#ffffff;
-    border:1px solid var(--border);
-    border-radius:20px;
-    padding:0.45rem 0.9rem;
-    font-size:0.82rem;
-    font-weight:500;
-    color:#334155;
-    cursor:pointer;
-    white-space:nowrap;
-    display:flex;
-    align-items:center;
-    gap:0.4rem;
-    box-shadow:0 1px 2px rgba(0,0,0,0.04);
-    transition:all 0.15s ease;
-  }
-  .quick-chip:hover {
-    background:var(--accent-light);
-    color:var(--accent);
-    border-color:var(--accent);
-    transform:translateY(-1px);
-    box-shadow:0 2px 4px rgba(13,148,136,0.12);
-  }
+
 
   form {
     display:flex;
@@ -244,17 +215,7 @@
   .typing-dot:nth-child(2) { animation-delay:-0.16s; }
   @keyframes typingBounce { 0%, 80%, 100% { transform:scale(0); opacity:0.3; } 40% { transform:scale(1); opacity:1; } }
 
-  /* Vehicle Filter Bar */
-  .filter-bar {
-    background:#ffffff; border-bottom:1px solid var(--border); padding:0.5rem 1.2rem;
-    display:flex; gap:0.5rem; align-items:center; overflow-x:auto; font-size:0.82rem;
-  }
-  .filter-label { font-weight:600; color:var(--text-secondary); white-space:nowrap; margin-right:0.3rem; }
-  .filter-toggle {
-    background:#f1f5f9; border:1px solid var(--border); border-radius:16px; padding:0.3rem 0.75rem;
-    cursor:pointer; color:#334155; font-weight:500; transition:all 0.15s ease; white-space:nowrap;
-  }
-  .filter-toggle.active { background:var(--accent-light); color:var(--accent); border-color:var(--accent); font-weight:600; }
+
 
   /* Driver HUD: Glanceable Telemetry Grid */
   .driver-hud-grid {
@@ -438,21 +399,12 @@
 <header>
   <div class="header-left">
     <span>🧭 SpotScout</span>
-    <span class="header-badge">San Francisco</span>
   </div>
   <div style="display:flex; align-items:center; gap:0.75rem;">
     <button type="button" class="hud-mode-toggle" id="hudToggle" title="Toggle In-Car Driver HUD Mode">🚗 Driver HUD</button>
-    <div style="font-size:0.85rem; font-weight:500; opacity:0.9;">Smart City Parking</div>
+    <div style="font-size:0.85rem; font-weight:500; opacity:0.9;">Smart Parking Assistant</div>
   </div>
 </header>
-
-<div class="filter-bar">
-  <span class="filter-label">Vehicle Profile:</span>
-  <button type="button" class="filter-toggle active" data-filter="">🚗 Any Vehicle</button>
-  <button type="button" class="filter-toggle" data-filter="My vehicle is an oversized SUV with 7ft clearance">🚙 Oversized SUV (&gt;6'6")</button>
-  <button type="button" class="filter-toggle" data-filter="I need a spot with EV charging available">⚡ EV Charging</button>
-  <button type="button" class="filter-toggle" data-filter="Only show covered indoor parking with high security">🛡️ Covered &amp; Secure</button>
-</div>
 
 <div id="log"></div>
 
@@ -460,16 +412,6 @@
   <div class="lightbox-content">
     <button type="button" class="lightbox-close" id="lightboxClose">✕</button>
     <img id="lightboxImg" src="" alt="Entrance Preview">
-  </div>
-</div>
-
-<div class="quick-prompts-container">
-  <div class="quick-title">Suggested Inquiries</div>
-  <div class="quick-prompts">
-    <button type="button" class="quick-chip" data-prompt="Find parking near Union Square with clearance above 6ft 6in">🅿️ Union Square (&gt;6'6" Clearance)</button>
-    <button type="button" class="quick-chip" data-prompt="Find parking near Chase Center with EV charging available">⚡ Chase Center (EV Charging)</button>
-    <button type="button" class="quick-chip" data-prompt="Find parking near Times Square, New York for 3 hours">🗽 Times Square, NY (3 Hours)</button>
-    <button type="button" class="quick-chip" data-prompt="What are the SF parking rules for yellow curb loading zones and parking on steep hills?">📜 SF Curb &amp; Hill Parking Rules</button>
   </div>
 </div>
 
@@ -1167,17 +1109,6 @@ function renderReply(b, parts) {
   log.scrollTop = log.scrollHeight;
 }
 
-// Selected vehicle profile filter
-let activeVehicleConstraint = "";
-
-document.querySelectorAll(".filter-toggle").forEach(btn => {
-  btn.addEventListener("click", () => {
-    document.querySelectorAll(".filter-toggle").forEach(b => b.classList.remove("active"));
-    btn.classList.add("active");
-    activeVehicleConstraint = btn.getAttribute("data-filter") || "";
-  });
-});
-
 // The proxy returns { parts: [{kind:"text",text} | {kind:"a2ui",data}] }.
 form.addEventListener("submit", async (ev) => {
   ev.preventDefault();
@@ -1198,15 +1129,9 @@ form.addEventListener("submit", async (ev) => {
       <span>SpotScout is searching live parking data…</span>
     </div>
   `;
-  
-  // If a vehicle profile filter is active and not already mentioned in prompt, append it
-  let fullPrompt = text;
-  if (activeVehicleConstraint && !text.toLowerCase().includes("suv") && !text.toLowerCase().includes("ev") && !text.toLowerCase().includes("clearance") && !text.toLowerCase().includes("covered")) {
-    fullPrompt += ` (Note: ${activeVehicleConstraint})`;
-  }
 
   try {
-    const res = await fetch("/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message: fullPrompt }) });
+    const res = await fetch("/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message: text }) });
     const raw = await res.text();
     let data;
     try { data = JSON.parse(raw); }
@@ -1215,17 +1140,6 @@ form.addEventListener("submit", async (ev) => {
   } catch (e) {
     b.textContent = "Error: " + e.message;
   }
-});
-
-// Clickable example prompt chips
-document.querySelectorAll(".quick-chip").forEach(chip => {
-  chip.addEventListener("click", () => {
-    const prompt = chip.getAttribute("data-prompt");
-    if (prompt) {
-      input.value = prompt;
-      form.requestSubmit();
-    }
-  });
 });
 
 // In-Car Driver HUD Mode Toggle
