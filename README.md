@@ -2,7 +2,12 @@
 
 An intelligent, multi-modal conversational agent that helps drivers navigate San Francisco's complex parking ecosystem. SpotScout finds parking options, computes real-time fee estimates, queries live garage occupancy and clearance restrictions from Google Cloud Firestore, remembers driver preferences across sessions with Vertex AI Memory Bank, renders interactive A2UI cards, and generates visual entrance guides and approach videos using Google's Gemini multimodal models.
 
-![SpotScout Demo](./demo.gif)
+![SpotScout Demo](./demo_v2.gif)
+*SpotScout Live Demo (v2: Decluttered UI, Google Search Grounding & Driver HUD)*
+
+> **Archive / Alternate Recordings:**
+> - [Original Prototype Demo (v1 GIF)](./demo_v1.gif) | [WebM Video](./spot_scout_demo_v1.webm)
+> - [Decluttered & Grounded Demo (v2 GIF)](./demo_v2.gif) | [WebM Video](./spot_scout_demo_v2.webm)
 
 ---
 
